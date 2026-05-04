@@ -1,0 +1,423 @@
+{
+  "date": "2026-04-22",
+  "xlsxPath": "/Users/huangshihyu/Documents/Codex/2026-04-20-files-mentioned-by-the-user-v3/outputs/chip-report/台股盤後籌碼_2026-04-22.xlsx",
+  "xlsxHref": "./outputs/chip-report/台股盤後籌碼_2026-04-22.xlsx",
+  "dashboard": {
+    "title": "台股盤後籌碼儀表板 2026-04-22",
+    "subtitle": "本次已補入 2026-04-22 可確認的 TWSE 與 TAIFEX 盤後數據；未能即時驗證的欄位以待補標示。",
+    "sections": [
+      {
+        "title": "留倉概況",
+        "cards": [
+          {
+            "label": "日期",
+            "value": "2026-04-22",
+            "note": "自動化執行日"
+          },
+          {
+            "label": "結算日",
+            "value": "待補",
+            "note": "需對齊原表 1~5 編碼"
+          },
+          {
+            "label": "當次月大台留倉差增減",
+            "value": "待補",
+            "note": "依 TX 近月/次月 OI 重建"
+          }
+        ]
+      },
+      {
+        "title": "大盤資訊",
+        "cards": [
+          {
+            "label": "加權指數",
+            "value": 37878.47,
+            "note": "TWSE / 中央社盤後摘要"
+          },
+          {
+            "label": "加權指數漲跌",
+            "value": 273.36,
+            "note": "TWSE / 中央社盤後摘要"
+          },
+          {
+            "label": "加權指數漲跌幅(%)",
+            "value": 0.73,
+            "note": "TWSE / 中央社盤後摘要"
+          },
+          {
+            "label": "加權指數當日高低差",
+            "value": 473.5,
+            "note": "38096.88 - 37623.38"
+          },
+          {
+            "label": "加權指數成交量(億)",
+            "value": 9460.33,
+            "note": "實際較接近成交金額(億元)"
+          },
+          {
+            "label": "PCR與結算比",
+            "value": "待補",
+            "note": "TAIFEX pcRatio，今日值待補"
+          },
+          {
+            "label": "融資金額(仟元)",
+            "value": "待補",
+            "note": "TWSE MI_MARGN"
+          },
+          {
+            "label": "融資金額變化量",
+            "value": "待補",
+            "note": "較前一日"
+          },
+          {
+            "label": "融券(交易單位)",
+            "value": "待補",
+            "note": "TWSE MI_MARGN"
+          },
+          {
+            "label": "融券單位變化量",
+            "value": "待補",
+            "note": "較前一日"
+          }
+        ]
+      },
+      {
+        "title": "外資布局",
+        "cards": [
+          {
+            "label": "外資現貨買賣超",
+            "value": 116.09,
+            "note": "TWSE T86 / MoneyDJ，億元"
+          },
+          {
+            "label": "外資(大小台)期貨未平倉",
+            "value": -42555,
+            "note": "TAIFEX 臺股期貨，口"
+          },
+          {
+            "label": "外資期貨未平倉與結算比",
+            "value": -5772,
+            "note": "-42555 - (-36783)"
+          },
+          {
+            "label": "外資期貨未平倉與前日增減",
+            "value": -1260,
+            "note": "-42555 - (-41295)"
+          },
+          {
+            "label": "外資(買)OP未平倉口數",
+            "value": 7510,
+            "note": "BC"
+          },
+          {
+            "label": "外資(買)OP未平倉金額",
+            "value": 1098547,
+            "note": "BC，千元"
+          },
+          {
+            "label": "外資(BC)OP未平倉金額與結算比",
+            "value": "待補",
+            "note": "需依原表公式推算"
+          },
+          {
+            "label": "外資(賣)OP未平倉口數",
+            "value": 11363,
+            "note": "BP"
+          },
+          {
+            "label": "外資(賣)OP未平倉金額",
+            "value": 125723,
+            "note": "BP，千元"
+          },
+          {
+            "label": "外資(BP)OP未平倉金額與結算比",
+            "value": "待補",
+            "note": "需依原表公式推算"
+          },
+          {
+            "label": "外資買方買權/賣權比",
+            "value": 0.661,
+            "note": "BC / BP"
+          },
+          {
+            "label": "外資買權/賣權比",
+            "value": 0.676,
+            "note": "(BC+SC)/(BP+SP)"
+          }
+        ]
+      },
+      {
+        "title": "自營布局",
+        "cards": [
+          {
+            "label": "自營(自行)現貨買賣超",
+            "value": 13.28,
+            "note": "TWSE T86 / MoneyDJ，億元"
+          },
+          {
+            "label": "自營(避險)現貨買賣超",
+            "value": -5.9,
+            "note": "TWSE T86 / MoneyDJ，億元"
+          },
+          {
+            "label": "自營(大小台)期貨未平倉",
+            "value": -4400,
+            "note": "TAIFEX 臺股期貨，口"
+          },
+          {
+            "label": "自營(買)OP未平倉口數",
+            "value": 20617,
+            "note": "BC"
+          },
+          {
+            "label": "自營(買)OP未平倉金額",
+            "value": 1427244,
+            "note": "BC，千元"
+          },
+          {
+            "label": "自營(BC)OP未平倉金額與結算比",
+            "value": "待補",
+            "note": "需依原表公式推算"
+          },
+          {
+            "label": "自營(賣)OP未平倉口數",
+            "value": 25020,
+            "note": "BP"
+          },
+          {
+            "label": "自營(賣)OP未平倉金額",
+            "value": 242314,
+            "note": "BP，千元"
+          },
+          {
+            "label": "自營(BP)OP未平倉金額與結算比",
+            "value": "待補",
+            "note": "需依原表公式推算"
+          },
+          {
+            "label": "自營買方買權/賣權比",
+            "value": 0.824,
+            "note": "BC / BP"
+          }
+        ]
+      },
+      {
+        "title": "散戶",
+        "cards": [
+          {
+            "label": "散戶看多",
+            "value": "待補",
+            "note": "需依原表公式推算"
+          },
+          {
+            "label": "散戶看空",
+            "value": "待補",
+            "note": "需依原表公式推算"
+          },
+          {
+            "label": "當次月小台留倉差增減",
+            "value": "待補",
+            "note": "依 MTX 近月/次月 OI 重建"
+          },
+          {
+            "label": "散戶未平倉",
+            "value": "待補",
+            "note": "需依原表公式推算"
+          },
+          {
+            "label": "微台散戶看多",
+            "value": "待補",
+            "note": "需依原表公式推算"
+          },
+          {
+            "label": "微台散戶看空",
+            "value": "待補",
+            "note": "需依原表公式推算"
+          },
+          {
+            "label": "微台散戶多空比",
+            "value": "待補",
+            "note": "需依原表公式推算"
+          },
+          {
+            "label": "微台散戶未平倉",
+            "value": "待補",
+            "note": "需依原表公式推算"
+          }
+        ]
+      }
+    ],
+    "summary": "已補入今日可驗證的官方或高可信盤後數據：TWSE 指數與三大法人現貨、TAIFEX 外資與自營期貨未平倉、以及臺指選擇權 BC/SC/BP/SP 未平倉口數與金額。PCR 今日值與融資融券官方明細仍待 TWSE / TAIFEX 完整揭露後補齊。"
+  },
+  "detail": {
+    "title": "選擇權細項儀表板 2026-04-22",
+    "subtitle": "BC / SC / BP / SP 細項獨立成卡；本次已補入 2026-04-22 TAIFEX 可驗證值。",
+    "sections": [
+      {
+        "title": "大盤概況",
+        "cards": [
+          {
+            "label": "日期",
+            "value": "2026-04-22",
+            "note": "自動化執行日"
+          },
+          {
+            "label": "結算日",
+            "value": "待補",
+            "note": "需對齊原表編碼"
+          },
+          {
+            "label": "當次月大台留倉差增減",
+            "value": "待補",
+            "note": "依 TX 近月/次月 OI 重建"
+          },
+          {
+            "label": "加權指數",
+            "value": 37878.47,
+            "note": "TWSE"
+          },
+          {
+            "label": "加權指數漲跌",
+            "value": 273.36,
+            "note": "TWSE"
+          },
+          {
+            "label": "加權指數漲跌幅(%)",
+            "value": 0.73,
+            "note": "TWSE"
+          }
+        ]
+      },
+      {
+        "title": "外資選擇權細項",
+        "cards": [
+          {
+            "label": "外資BC口數",
+            "value": 7510,
+            "note": "買權買方"
+          },
+          {
+            "label": "外資BC金額",
+            "value": 1098547,
+            "note": "千元"
+          },
+          {
+            "label": "外資SC口數",
+            "value": 7858,
+            "note": "買權賣方"
+          },
+          {
+            "label": "外資SC金額",
+            "value": 902853,
+            "note": "千元"
+          },
+          {
+            "label": "外資(SC增幅-BC增幅)金額",
+            "value": 6189,
+            "note": "(-171) - (-6360)，依今昨金額差計算"
+          },
+          {
+            "label": "外資BC/SC增幅比例",
+            "value": "待補",
+            "note": "需依前一日比較"
+          },
+          {
+            "label": "外資BP口數",
+            "value": 11363,
+            "note": "賣權買方"
+          },
+          {
+            "label": "外資BP金額",
+            "value": 125723,
+            "note": "千元"
+          },
+          {
+            "label": "外資SP口數",
+            "value": 11362,
+            "note": "賣權賣方"
+          },
+          {
+            "label": "外資SP金額",
+            "value": 108859,
+            "note": "千元"
+          },
+          {
+            "label": "外資(SP增幅-BP增幅)金額",
+            "value": -12403,
+            "note": "(-19442) - (-7039)，依今昨金額差計算"
+          },
+          {
+            "label": "外資BP/SP增幅比例",
+            "value": "待補",
+            "note": "需依前一日比較"
+          }
+        ]
+      },
+      {
+        "title": "自營選擇權細項",
+        "cards": [
+          {
+            "label": "自營BC口數",
+            "value": 20617,
+            "note": "買權買方"
+          },
+          {
+            "label": "自營BC金額",
+            "value": 1427244,
+            "note": "千元"
+          },
+          {
+            "label": "自營SC口數",
+            "value": 16261,
+            "note": "買權賣方"
+          },
+          {
+            "label": "自營SC金額",
+            "value": 1474135,
+            "note": "千元"
+          },
+          {
+            "label": "自營(SC增幅-BC增幅)金額",
+            "value": "待補",
+            "note": "需依前一日比較"
+          },
+          {
+            "label": "自營BC/SC增幅比例",
+            "value": "待補",
+            "note": "需依前一日比較"
+          },
+          {
+            "label": "自營BP口數",
+            "value": 25020,
+            "note": "賣權買方"
+          },
+          {
+            "label": "自營BP金額",
+            "value": 242314,
+            "note": "千元"
+          },
+          {
+            "label": "自營SP口數",
+            "value": 18392,
+            "note": "賣權賣方"
+          },
+          {
+            "label": "自營SP金額",
+            "value": 208437,
+            "note": "千元"
+          },
+          {
+            "label": "自營(SP增幅-BP增幅)金額",
+            "value": "待補",
+            "note": "需依前一日比較"
+          },
+          {
+            "label": "自營BP/SP增幅比例",
+            "value": "待補",
+            "note": "需依前一日比較"
+          }
+        ]
+      }
+    ]
+  }
+}

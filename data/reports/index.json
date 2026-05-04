@@ -1,0 +1,48 @@
+{
+  "latestDate": "2026-04-30",
+  "generatedAt": "2026-05-04T07:34:07.530Z",
+  "reports": [
+    {
+      "date": "2026-04-30",
+      "title": "台股盤後籌碼儀表板 2026-04-30",
+      "xlsxHref": "./outputs/chip-report/台股盤後籌碼_2026-04-30.xlsx",
+      "jsonFile": "2026-04-30.json"
+    },
+    {
+      "date": "2026-04-29",
+      "title": "台股盤後籌碼儀表板 2026-04-29",
+      "xlsxHref": "./outputs/chip-report/台股盤後籌碼_2026-04-29.xlsx",
+      "jsonFile": "2026-04-29.json"
+    },
+    {
+      "date": "2026-04-28",
+      "title": "台股盤後籌碼儀表板 2026-04-28",
+      "xlsxHref": "./outputs/chip-report/台股盤後籌碼_2026-04-28.xlsx",
+      "jsonFile": "2026-04-28.json"
+    },
+    {
+      "date": "2026-04-27",
+      "title": "台股盤後籌碼儀表板 2026-04-27",
+      "xlsxHref": "./outputs/chip-report/台股盤後籌碼_2026-04-27.xlsx",
+      "jsonFile": "2026-04-27.json"
+    },
+    {
+      "date": "2026-04-24",
+      "title": "台股盤後籌碼儀表板 2026-04-24",
+      "xlsxHref": "./outputs/chip-report/台股盤後籌碼_2026-04-24.xlsx",
+      "jsonFile": "2026-04-24.json"
+    },
+    {
+      "date": "2026-04-23",
+      "title": "台股盤後籌碼儀表板 2026-04-23",
+      "xlsxHref": "./outputs/chip-report/台股盤後籌碼_2026-04-23.xlsx",
+      "jsonFile": "2026-04-23.json"
+    },
+    {
+      "date": "2026-04-22",
+      "title": "台股盤後籌碼儀表板 2026-04-22",
+      "xlsxHref": "./outputs/chip-report/台股盤後籌碼_2026-04-22.xlsx",
+      "jsonFile": "2026-04-22.json"
+    }
+  ]
+}

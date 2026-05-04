@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>台股盤後籌碼儀表板</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <p class="eyebrow">Daily Chip Flow</p>
+          <h1>台股盤後籌碼</h1>
+          <p class="subcopy">刷新網址就讀最新 JSON 快照，左側可切換歷史日期。</p>
+        </div>
+        <div class="history-panel">
+          <div class="history-head">
+            <span>歷史資料</span>
+            <button id="refreshButton" type="button">重新整理</button>
+          </div>
+          <nav id="historyList" class="history-list"></nav>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="hero">
+          <div>
+            <p class="eyebrow">Latest Snapshot</p>
+            <h2 id="heroTitle">載入中...</h2>
+            <p id="heroSubtitle" class="hero-subtitle"></p>
+          </div>
+          <div class="hero-side">
+            <div class="status-panel">
+              <div class="status-row">
+                <span class="status-label">最新資料日期</span>
+                <span id="statusLatestDate" class="status-value">—</span>
+              </div>
+              <div class="status-row">
+                <span class="status-label">快照更新時間</span>
+                <span id="statusGeneratedAt" class="status-value">—</span>
+              </div>
+              <div class="status-row">
+                <span class="status-label">今日整理狀態</span>
+                <span id="statusToday" class="status-pill">檢查中</span>
+              </div>
+            </div>
+            <a id="downloadLink" class="download-link" href="#" target="_blank" rel="noreferrer">下載當日 Excel</a>
+          </div>
+        </section>
+
+        <section class="tabs">
+          <button class="tab is-active" data-tab="dashboard" type="button">主表</button>
+          <button class="tab" data-tab="detail" type="button">Sheet1</button>
+        </section>
+
+        <section id="dashboardView" class="view is-active">
+          <div id="dashboardSections" class="sections"></div>
+          <article class="summary-block">
+            <h3>摘要</h3>
+            <p id="dashboardSummary"></p>
+          </article>
+        </section>
+
+        <section id="detailView" class="view">
+          <div id="detailSections" class="sections"></div>
+        </section>
+      </main>
+    </div>
+
+    <template id="sectionTemplate">
+      <section class="section-block">
+        <div class="section-head">
+          <h3></h3>
+        </div>
+        <div class="card-grid"></div>
+      </section>
+    </template>
+
+    <template id="cardTemplate">
+      <article class="card">
+        <p class="card-label"></p>
+        <p class="card-value"></p>
+        <p class="card-note"></p>
+      </article>
+    </template>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
