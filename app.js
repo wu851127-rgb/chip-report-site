@@ -47,6 +47,7 @@ function formatTaipeiTime(isoString) {
 
 function buildCard(card) {
   const node = els.cardTemplate.content.firstElementChild.cloneNode(true);
+  if (card.alert) node.classList.add("card-alert");
   node.querySelector(".card-label").textContent = card.label ?? "";
   node.querySelector(".card-value").textContent = renderValue(card.value);
   node.querySelector(".card-note").textContent = card.note ?? "";
