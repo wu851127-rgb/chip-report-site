@@ -24,9 +24,21 @@ const els = {
   cardTemplate: document.querySelector("#cardTemplate"),
 };
 
-function renderValue(value) {
+function countDecimalsFromFormat(numFmt) {
+  const match = numFmt?.match(/0\.(0+)/);
+  return match ? match[1].length : 0;
+}
+
+function renderValue(value, numFmt = "") {
   if (value === null || value === undefined) return "—";
   if (typeof value === "number") {
+    if (numFmt.includes("%")) {
+      const decimals = countDecimalsFromFormat(numFmt);
+      return `${(value * 100).toLocaleString("zh-TW", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      })}%`;
+    }
     return Number.isInteger(value)
       ? value.toLocaleString("zh-TW")
       : value.toLocaleString("zh-TW", { maximumFractionDigits: 6 });
@@ -89,7 +101,7 @@ function buildCard(card) {
     badge.textContent = card.alertLabel;
   }
   node.querySelector(".card-label").textContent = card.label ?? "";
-  node.querySelector(".card-value").textContent = renderValue(card.value);
+  node.querySelector(".card-value").textContent = renderValue(card.value, card.numFmt ?? "");
   node.querySelector(".card-note").textContent = card.note ?? "";
   return node;
 }
