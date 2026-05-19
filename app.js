@@ -27,9 +27,20 @@ const els = {
 function renderValue(value) {
   if (value === null || value === undefined) return "—";
   if (typeof value === "number") {
-    return Number.isInteger(value) ? value.toLocaleString("zh-TW") : value.toLocaleString("zh-TW", { maximumFractionDigits: 6 });
+    return Number.isInteger(value)
+      ? value.toLocaleString("zh-TW")
+      : value.toLocaleString("zh-TW", { maximumFractionDigits: 6 });
   }
   return String(value);
+}
+
+function numericValue(value) {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.replaceAll(",", ""));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 
 function formatTaipeiTime(isoString) {
@@ -45,9 +56,33 @@ function formatTaipeiTime(isoString) {
   }).format(date);
 }
 
+function determineFlowTone(value) {
+  const numeric = numericValue(value);
+  if (numeric === null) return "neutral";
+  if (numeric > 0) return "bull";
+  if (numeric < 0) return "bear";
+  return "neutral";
+}
+
+function determineRiskTone(value, threshold) {
+  const numeric = numericValue(value);
+  if (numeric === null) return "neutral";
+  if (numeric >= threshold) return "risk";
+  if (numeric > 0) return "bull";
+  if (numeric < 0) return "bear";
+  return "neutral";
+}
+
 function buildCard(card) {
   const node = els.cardTemplate.content.firstElementChild.cloneNode(true);
   if (card.alert) node.classList.add("card-alert");
+  const numeric = numericValue(card.value);
+  if (card.alert) {
+    node.classList.add("card-risk");
+  } else if (numeric !== null) {
+    if (numeric > 0) node.classList.add("card-bull");
+    if (numeric < 0) node.classList.add("card-bear");
+  }
   const badge = node.querySelector(".card-alert-badge");
   if (card.alertLabel) {
     badge.hidden = false;
@@ -121,9 +156,7 @@ async function loadIndex() {
   state.currentDate = dateFromQuery || state.index.latestDate;
   renderStatus(state.index, state.currentDate);
   renderHistory(state.index);
-  if (state.currentDate) {
-    await loadReport(state.currentDate, false);
-  }
+  if (state.currentDate) await loadReport(state.currentDate, false);
 }
 
 async function loadReport(date, updateQuery = true) {
