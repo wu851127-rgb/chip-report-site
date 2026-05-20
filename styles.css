@@ -14,6 +14,7 @@
   --risk: #ff2d55;
   --neutral: #8fa3bb;
   --shadow: 0 20px 48px rgba(0, 0, 0, 0.32);
+  --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 * {
@@ -53,12 +54,12 @@ body {
 .section-block,
 .summary-block {
   border: 1px solid var(--line);
-  box-shadow: var(--shadow);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
 }
 
 .brand,
 .history-panel {
-  border-radius: 16px;
+  border-radius: 6px;
   background: rgba(17, 31, 52, 0.72);
   padding: 18px;
 }
@@ -116,9 +117,11 @@ body {
   border: 1px solid var(--line-strong);
   background: rgba(255, 176, 0, 0.08);
   color: var(--text);
-  border-radius: 999px;
+  border-radius: 3px;
   padding: 8px 14px;
   cursor: pointer;
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
 }
 
 #refreshButton:hover,
@@ -139,7 +142,7 @@ body {
   border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.03);
   color: var(--text);
-  border-radius: 10px;
+  border-radius: 3px;
   padding: 12px 14px;
   cursor: pointer;
   text-align: left;
@@ -167,7 +170,7 @@ body {
 .hero,
 .section-block,
 .summary-block {
-  border-radius: 16px;
+  border-radius: 4px;
   background: linear-gradient(180deg, rgba(10, 18, 28, 0.98) 0%, rgba(4, 8, 14, 1) 100%);
 }
 
@@ -195,7 +198,7 @@ body {
 
 .status-panel {
   min-width: 320px;
-  border-radius: 10px;
+  border-radius: 3px;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--line);
@@ -217,7 +220,8 @@ body {
 .status-value {
   font-size: 12px;
   font-weight: 700;
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .status-pill {
@@ -225,11 +229,13 @@ body {
   align-items: center;
   justify-content: center;
   min-width: 84px;
-  border-radius: 4px;
+  border-radius: 2px;
   padding: 6px 10px;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
+  border: 1px solid var(--line);
+  font-family: var(--mono);
 }
 
 .status-pill.is-good {
@@ -247,8 +253,10 @@ body {
   color: var(--text);
   text-decoration: none;
   padding: 10px 14px;
-  border-radius: 999px;
+  border-radius: 3px;
   border: 1px solid rgba(255, 176, 0, 0.28);
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
 }
 
 .tabs {
@@ -261,9 +269,11 @@ body {
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   padding: 8px 14px;
-  border-radius: 999px;
+  border-radius: 2px;
   cursor: pointer;
   font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
 }
 
 .tab.is-active {
@@ -313,9 +323,10 @@ body {
   overflow: hidden;
   min-height: 132px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 2px;
   padding: 12px;
   background: linear-gradient(180deg, rgba(14, 24, 38, 0.98) 0%, rgba(7, 13, 22, 1) 100%);
+  box-shadow: none;
 }
 
 .card::before {
@@ -347,20 +358,21 @@ body {
 .card-alert-badge {
   display: inline-flex;
   align-items: center;
-  border-radius: 4px;
-  padding: 4px 7px;
+  border-radius: 2px;
+  padding: 3px 6px;
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #ffd7e3;
-  background: rgba(255, 45, 85, 0.14);
-  border: 1px solid rgba(255, 45, 85, 0.28);
+  color: #0b0f16;
+  background: #ffb000;
+  border: 1px solid #ffb000;
+  font-family: var(--mono);
 }
 
 .card.card-alert {
   border-color: rgba(255, 45, 85, 0.4);
-  box-shadow: 0 14px 32px rgba(255, 45, 85, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 45, 85, 0.16);
 }
 
 .card-label {
@@ -379,13 +391,17 @@ body {
   font-weight: 800;
   color: var(--text);
   word-break: break-word;
-  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
 }
 
 .card-note {
   margin: 0;
   font-size: 11px;
   line-height: 1.45;
+  font-family: var(--mono);
+  opacity: 0.88;
 }
 
 .card-bull .card-value {
