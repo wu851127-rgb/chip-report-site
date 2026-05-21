@@ -217,7 +217,7 @@ function buildStrategyView(report) {
     tone,
     toneLabel,
     body,
-    flag: contrarianBullSignal ? "積極偏多" : longSignal ? "做多訊號" : "",
+    flag: contrarianBullSignal ? "逆勢做多" : longSignal ? "多方異常" : "",
   };
 }
 
