@@ -408,8 +408,16 @@ body {
   font-family: var(--mono);
 }
 
-.strategy-legend {
-  margin: 0 0 8px;
+.strategy-signals-caption {
+  margin: -2px 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.strategy-caption-left,
+.strategy-caption-right {
   color: #7f93ad;
   font-size: 10px;
   line-height: 1.4;
