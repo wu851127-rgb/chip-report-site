@@ -413,7 +413,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 14px;
+  gap: 8px;
 }
 
 .strategy-caption-left,
@@ -423,6 +423,15 @@ body {
   line-height: 1.4;
   letter-spacing: 0.06em;
   font-family: var(--mono);
+  text-align: center;
+}
+
+.strategy-caption-left {
+  width: 108px;
+}
+
+.strategy-caption-right {
+  width: 96px;
 }
 
 .strategy-body {
