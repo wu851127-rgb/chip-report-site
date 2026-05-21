@@ -149,12 +149,21 @@ function buildStrategyView(report) {
     bcSettle >= 1_000_000 &&
     foreignScBcDelta !== null &&
     foreignScBcDelta <= -300000;
+  const contrarianBullSignal =
+    longSignal &&
+    indexChange !== null &&
+    indexChange < 0 &&
+    foreignSpot !== null &&
+    foreignSpot < 0;
 
   if (longSignal) score += 3;
 
   let tone = "neutral";
   let toneLabel = "中性";
-  if (longSignal || score >= 3) {
+  if (contrarianBullSignal) {
+    tone = "risk";
+    toneLabel = "積極偏多";
+  } else if (longSignal || score >= 3) {
     tone = "bull";
     toneLabel = "偏多";
   } else if (score <= -3) {
@@ -190,15 +199,20 @@ function buildStrategyView(report) {
   const expertLongPhrase = longSignal
     ? `外資 BC 原始金額 ${renderValue(foreignBcAmount, "#,##0")} 仍屬偏大的買權槓桿部位，同時 SC 金額縮到 ${renderValue(foreignScAmount, "#,##0")}，且 SC 相對 BC 的減碼差達 ${renderValue(foreignScBcDelta, "#,##0")}；這組合視為偏多做多訊號。`
     : "";
+  const contrarianPhrase = contrarianBullSignal
+    ? "當天指數收跌、外資現貨也同步賣超，但選擇權槓桿端反而維持大買權部位且 SC 顯著下降，屬於逆勢布局訊號，應提高對多方企圖的權重。"
+    : "";
 
-  const body = longSignal
+  const body = contrarianBullSignal
+    ? `${indexPhrase}，${spotPhrase}；${futPhrase}。${optionPhrase}。${expertLongPhrase} ${contrarianPhrase} ${leveragePhrase} 綜合判斷應以積極偏多看待，可優先站在多方思維，盤中拉回偏向找買點，但仍需控管部位節奏。`
+    : longSignal
     ? `${indexPhrase}，${spotPhrase}；${futPhrase}。${optionPhrase}。${expertLongPhrase} ${leveragePhrase} 綜合判斷以偏多看待，策略上可優先站在多方思維，拉回再找切入點，但仍需控管追價風險。`
     : `${indexPhrase}，${spotPhrase}；${futPhrase}。${optionPhrase}。${leveragePhrase} 綜合判斷先以${toneLabel}看待，操作上以關鍵支撐壓力附近做增減碼，避免單靠單一訊號重押。`;
   return {
     tone,
     toneLabel,
     body,
-    flag: longSignal ? "做多訊號" : "",
+    flag: contrarianBullSignal ? "積極偏多" : longSignal ? "做多訊號" : "",
   };
 }
 
