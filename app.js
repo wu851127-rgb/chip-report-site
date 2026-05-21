@@ -14,6 +14,7 @@ const els = {
   detailSections: document.querySelector("#detailSections"),
   dashboardSummary: document.querySelector("#dashboardSummary"),
   strategyPanel: document.querySelector("#strategyPanel"),
+  strategyFlag: document.querySelector("#strategyFlag"),
   strategyTone: document.querySelector("#strategyTone"),
   strategyBody: document.querySelector("#strategyBody"),
   downloadLink: document.querySelector("#downloadLink"),
@@ -98,6 +99,16 @@ function collectCards(report) {
   return entries;
 }
 
+function collectAllCards(report) {
+  const entries = collectCards(report);
+  for (const section of report.detail.sections ?? []) {
+    for (const card of section.cards ?? []) {
+      entries.push({ section: section.title, ...card });
+    }
+  }
+  return entries;
+}
+
 function getCardValue(cards, label) {
   const card = cards.find((item) => item.label === label);
   return card ? numericValue(card.value) : null;
@@ -111,6 +122,7 @@ function getCardRender(cards, label) {
 
 function buildStrategyView(report) {
   const cards = collectCards(report);
+  const allCards = collectAllCards(report);
   const indexChange = getCardValue(cards, "加權指數漲跌");
   const foreignSpot = getCardValue(cards, "外資現貨買賣超");
   const foreignFut = getCardValue(cards, "外資(大小台)期貨未平倉");
@@ -119,6 +131,9 @@ function buildStrategyView(report) {
   const bcSettle = getCardValue(cards, "外資(BC)OP未平倉金額與結算比");
   const foreignCpRatio = getCardValue(cards, "外資買權/賣權比");
   const dealerCpRatio = getCardValue(cards, "自營買方買權/賣權比");
+  const foreignScBcDelta = getCardValue(allCards, "外資(SC增幅-BC增幅)金額");
+  const foreignScAmount = getCardValue(allCards, "外資SC金額");
+  const foreignBcAmount = getCardValue(allCards, "外資BC金額");
 
   let score = 0;
   if (indexChange !== null) score += indexChange > 0 ? 1 : -1;
@@ -129,9 +144,17 @@ function buildStrategyView(report) {
   if (dealerCpRatio !== null) score += dealerCpRatio > 1 ? 1 : -1;
   if (bcSettle !== null && bcSettle >= 1_000_000) score += 1;
 
+  const longSignal =
+    bcSettle !== null &&
+    bcSettle >= 1_000_000 &&
+    foreignScBcDelta !== null &&
+    foreignScBcDelta <= -300000;
+
+  if (longSignal) score += 3;
+
   let tone = "neutral";
   let toneLabel = "中性";
-  if (score >= 3) {
+  if (longSignal || score >= 3) {
     tone = "bull";
     toneLabel = "偏多";
   } else if (score <= -3) {
@@ -164,9 +187,19 @@ function buildStrategyView(report) {
       : bcSettle >= 1_000_000
         ? `外資 BC 結算比 ${getCardRender(cards, "外資(BC)OP未平倉金額與結算比")} 已進入高槓桿區，短線宜嚴控追價節奏。`
         : `外資 BC 結算比 ${getCardRender(cards, "外資(BC)OP未平倉金額與結算比")}，槓桿尚未失控。`;
+  const expertLongPhrase = longSignal
+    ? `外資 BC 原始金額 ${renderValue(foreignBcAmount, "#,##0")} 仍屬偏大的買權槓桿部位，同時 SC 金額縮到 ${renderValue(foreignScAmount, "#,##0")}，且 SC 相對 BC 的減碼差達 ${renderValue(foreignScBcDelta, "#,##0")}；這組合視為偏多做多訊號。`
+    : "";
 
-  const body = `${indexPhrase}，${spotPhrase}；${futPhrase}。${optionPhrase}。${leveragePhrase} 綜合判斷先以${toneLabel}看待，操作上以關鍵支撐壓力附近做增減碼，避免單靠單一訊號重押。`;
-  return { tone, toneLabel, body };
+  const body = longSignal
+    ? `${indexPhrase}，${spotPhrase}；${futPhrase}。${optionPhrase}。${expertLongPhrase} ${leveragePhrase} 綜合判斷以偏多看待，策略上可優先站在多方思維，拉回再找切入點，但仍需控管追價風險。`
+    : `${indexPhrase}，${spotPhrase}；${futPhrase}。${optionPhrase}。${leveragePhrase} 綜合判斷先以${toneLabel}看待，操作上以關鍵支撐壓力附近做增減碼，避免單靠單一訊號重押。`;
+  return {
+    tone,
+    toneLabel,
+    body,
+    flag: longSignal ? "做多訊號" : "",
+  };
 }
 
 function renderStrategy(report) {
@@ -174,6 +207,13 @@ function renderStrategy(report) {
   els.strategyPanel.hidden = false;
   els.strategyPanel.classList.remove("tone-bull", "tone-bear", "tone-risk", "tone-neutral");
   els.strategyPanel.classList.add(`tone-${strategy.tone}`);
+  if (strategy.flag) {
+    els.strategyFlag.hidden = false;
+    els.strategyFlag.textContent = strategy.flag;
+  } else {
+    els.strategyFlag.hidden = true;
+    els.strategyFlag.textContent = "";
+  }
   els.strategyTone.textContent = strategy.toneLabel;
   els.strategyTone.className = `strategy-tone tone-${strategy.tone}`;
   els.strategyBody.textContent = strategy.body;
