@@ -134,6 +134,10 @@ function buildStrategyView(report) {
   const foreignScBcDelta = getCardValue(allCards, "外資(SC增幅-BC增幅)金額");
   const foreignScAmount = getCardValue(allCards, "外資SC金額");
   const foreignBcAmount = getCardValue(allCards, "外資BC金額");
+  const isSettlementResetDay = bcSettle === 0;
+  const largeBcPosition =
+    (bcSettle !== null && bcSettle >= 1_000_000) ||
+    (foreignBcAmount !== null && foreignBcAmount >= 1_000_000);
 
   let score = 0;
   if (indexChange !== null) score += indexChange > 0 ? 1 : -1;
@@ -142,11 +146,10 @@ function buildStrategyView(report) {
   if (foreignFutVsSettle !== null) score += foreignFutVsSettle > 0 ? 1 : -1;
   if (foreignCpRatio !== null) score += foreignCpRatio > 1 ? 1 : -1;
   if (dealerCpRatio !== null) score += dealerCpRatio > 1 ? 1 : -1;
-  if (bcSettle !== null && bcSettle >= 1_000_000) score += 1;
+  if (largeBcPosition) score += 1;
 
   const longSignal =
-    bcSettle !== null &&
-    bcSettle >= 1_000_000 &&
+    largeBcPosition &&
     foreignScBcDelta !== null &&
     foreignScBcDelta <= -300000;
   const contrarianBullSignal =
@@ -191,11 +194,13 @@ function buildStrategyView(report) {
       ? "選擇權比值待補"
       : `外資淨買權/賣權比 ${getCardRender(cards, "外資買權/賣權比")}，自營買方比 ${getCardRender(cards, "自營買方買權/賣權比")}`;
   const leveragePhrase =
-    bcSettle === null
+    foreignBcAmount === null
       ? "買權槓桿待補"
-      : bcSettle >= 1_000_000
-        ? `外資 BC 結算比 ${getCardRender(cards, "外資(BC)OP未平倉金額與結算比")} 已進入高槓桿區，短線宜嚴控追價節奏。`
-        : `外資 BC 結算比 ${getCardRender(cards, "外資(BC)OP未平倉金額與結算比")}，槓桿尚未失控。`;
+      : isSettlementResetDay
+        ? `今日為結算日，BC 結算比歸零屬正常重置；改以外資 BC 原始金額 ${renderValue(foreignBcAmount, "#,##0")} 判斷槓桿部位。`
+        : largeBcPosition
+          ? `外資 BC 部位偏大；${bcSettle !== null ? `BC 結算比 ${getCardRender(cards, "外資(BC)OP未平倉金額與結算比")}，` : ""}BC 原始金額 ${renderValue(foreignBcAmount, "#,##0")} 顯示槓桿仍高。`
+          : `外資 BC 原始金額 ${renderValue(foreignBcAmount, "#,##0")}，槓桿尚未失控。`;
   const expertLongPhrase = longSignal
     ? `外資 BC 原始金額 ${renderValue(foreignBcAmount, "#,##0")} 仍屬偏大的買權槓桿部位，同時 SC 金額縮到 ${renderValue(foreignScAmount, "#,##0")}，且 SC 相對 BC 的減碼差達 ${renderValue(foreignScBcDelta, "#,##0")}；這組合視為偏多做多訊號。`
     : "";
