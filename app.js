@@ -13,6 +13,9 @@ const els = {
   dashboardSections: document.querySelector("#dashboardSections"),
   detailSections: document.querySelector("#detailSections"),
   dashboardSummary: document.querySelector("#dashboardSummary"),
+  strategyPanel: document.querySelector("#strategyPanel"),
+  strategyTone: document.querySelector("#strategyTone"),
+  strategyBody: document.querySelector("#strategyBody"),
   downloadLink: document.querySelector("#downloadLink"),
   tabs: [...document.querySelectorAll(".tab")],
   views: {
@@ -83,6 +86,97 @@ function determineRiskTone(value, threshold) {
   if (numeric > 0) return "bull";
   if (numeric < 0) return "bear";
   return "neutral";
+}
+
+function collectCards(report) {
+  const entries = [];
+  for (const section of report.dashboard.sections ?? []) {
+    for (const card of section.cards ?? []) {
+      entries.push({ section: section.title, ...card });
+    }
+  }
+  return entries;
+}
+
+function getCardValue(cards, label) {
+  const card = cards.find((item) => item.label === label);
+  return card ? numericValue(card.value) : null;
+}
+
+function getCardRender(cards, label) {
+  const card = cards.find((item) => item.label === label);
+  if (!card) return "—";
+  return renderValue(card.value, card.numFmt ?? "");
+}
+
+function buildStrategyView(report) {
+  const cards = collectCards(report);
+  const indexChange = getCardValue(cards, "加權指數漲跌");
+  const foreignSpot = getCardValue(cards, "外資現貨買賣超");
+  const foreignFut = getCardValue(cards, "外資(大小台)期貨未平倉");
+  const foreignFutDelta = getCardValue(cards, "外資期貨未平倉與前日增減");
+  const foreignFutVsSettle = getCardValue(cards, "外資期貨未平倉與結算比");
+  const bcSettle = getCardValue(cards, "外資(BC)OP未平倉金額與結算比");
+  const foreignCpRatio = getCardValue(cards, "外資買權/賣權比");
+  const dealerCpRatio = getCardValue(cards, "自營買方買權/賣權比");
+
+  let score = 0;
+  if (indexChange !== null) score += indexChange > 0 ? 1 : -1;
+  if (foreignSpot !== null) score += foreignSpot > 0 ? 1 : -1;
+  if (foreignFutDelta !== null) score += foreignFutDelta > 0 ? 1 : -1;
+  if (foreignFutVsSettle !== null) score += foreignFutVsSettle > 0 ? 1 : -1;
+  if (foreignCpRatio !== null) score += foreignCpRatio > 1 ? 1 : -1;
+  if (dealerCpRatio !== null) score += dealerCpRatio > 1 ? 1 : -1;
+  if (bcSettle !== null && bcSettle >= 1_000_000) score += 1;
+
+  let tone = "neutral";
+  let toneLabel = "中性";
+  if (score >= 3) {
+    tone = "bull";
+    toneLabel = "偏多";
+  } else if (score <= -3) {
+    tone = "bear";
+    toneLabel = "偏空";
+  } else if (bcSettle !== null && bcSettle >= 1_000_000) {
+    tone = "risk";
+    toneLabel = "警示";
+  }
+
+  const indexPhrase =
+    indexChange === null
+      ? "指數方向待補"
+      : `指數${indexChange > 0 ? "收高" : "收低"}${getCardRender(cards, "加權指數漲跌")}`;
+  const spotPhrase =
+    foreignSpot === null
+      ? "現貨籌碼待補"
+      : `外資現貨${foreignSpot > 0 ? "回補" : "調節"}${getCardRender(cards, "外資現貨買賣超")}`;
+  const futPhrase =
+    foreignFut === null || foreignFutDelta === null
+      ? "期貨留倉待補"
+      : `大小台留倉來到 ${getCardRender(cards, "外資(大小台)期貨未平倉")}，日變動 ${getCardRender(cards, "外資期貨未平倉與前日增減")}`;
+  const optionPhrase =
+    foreignCpRatio === null || dealerCpRatio === null
+      ? "選擇權比值待補"
+      : `外資淨買權/賣權比 ${getCardRender(cards, "外資買權/賣權比")}，自營買方比 ${getCardRender(cards, "自營買方買權/賣權比")}`;
+  const leveragePhrase =
+    bcSettle === null
+      ? "買權槓桿待補"
+      : bcSettle >= 1_000_000
+        ? `外資 BC 結算比 ${getCardRender(cards, "外資(BC)OP未平倉金額與結算比")} 已進入高槓桿區，短線宜嚴控追價節奏。`
+        : `外資 BC 結算比 ${getCardRender(cards, "外資(BC)OP未平倉金額與結算比")}，槓桿尚未失控。`;
+
+  const body = `${indexPhrase}，${spotPhrase}；${futPhrase}。${optionPhrase}。${leveragePhrase} 綜合判斷先以${toneLabel}看待，操作上以關鍵支撐壓力附近做增減碼，避免單靠單一訊號重押。`;
+  return { tone, toneLabel, body };
+}
+
+function renderStrategy(report) {
+  const strategy = buildStrategyView(report);
+  els.strategyPanel.hidden = false;
+  els.strategyPanel.classList.remove("tone-bull", "tone-bear", "tone-risk", "tone-neutral");
+  els.strategyPanel.classList.add(`tone-${strategy.tone}`);
+  els.strategyTone.textContent = strategy.toneLabel;
+  els.strategyTone.className = `strategy-tone tone-${strategy.tone}`;
+  els.strategyBody.textContent = strategy.body;
 }
 
 function buildCard(card) {
@@ -185,6 +279,7 @@ async function loadReport(date, updateQuery = true) {
   els.dashboardSummary.textContent = report.dashboard.summary ?? "";
   els.downloadLink.href = report.xlsxHref ?? "#";
 
+  renderStrategy(report);
   renderSections(els.dashboardSections, report.dashboard.sections);
   renderSections(els.detailSections, report.detail.sections);
   renderStatus(state.index, state.currentDate);

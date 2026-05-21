@@ -290,6 +290,99 @@ body {
   display: block;
 }
 
+.strategy-panel {
+  margin-bottom: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  padding: 14px 16px;
+  background:
+    linear-gradient(90deg, rgba(255, 176, 0, 0.06) 0, rgba(255, 176, 0, 0) 24%),
+    linear-gradient(180deg, rgba(10, 18, 28, 0.98) 0%, rgba(4, 8, 14, 1) 100%);
+  box-shadow: none;
+}
+
+.strategy-panel.tone-bull {
+  border-color: rgba(255, 91, 87, 0.34);
+}
+
+.strategy-panel.tone-bear {
+  border-color: rgba(47, 207, 122, 0.34);
+}
+
+.strategy-panel.tone-risk {
+  border-color: rgba(255, 45, 85, 0.42);
+}
+
+.strategy-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.strategy-kicker {
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+}
+
+.strategy-tone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  background: rgba(143, 163, 187, 0.08);
+  color: var(--neutral);
+}
+
+.strategy-tone.tone-bull {
+  background: rgba(255, 91, 87, 0.12);
+  color: var(--bull);
+  border-color: rgba(255, 91, 87, 0.26);
+}
+
+.strategy-tone.tone-bear {
+  background: rgba(47, 207, 122, 0.12);
+  color: var(--bear);
+  border-color: rgba(47, 207, 122, 0.26);
+}
+
+.strategy-tone.tone-risk {
+  background: rgba(255, 45, 85, 0.14);
+  color: #ff94ad;
+  border-color: rgba(255, 45, 85, 0.34);
+}
+
+.strategy-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 0.08em;
+  font-family: var(--mono);
+}
+
+.strategy-body {
+  margin: 0;
+  color: #d6dfec;
+  font-size: 12px;
+  line-height: 1.7;
+  font-family: "IBM Plex Sans", "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+}
+
 .sections {
   display: flex;
   flex-direction: column;
