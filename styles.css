@@ -94,6 +94,16 @@ body {
   line-height: 1.7;
 }
 
+.brand .subcopy {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
+  color: #7f93ad;
+  font-family: var(--mono);
+  font-weight: 500;
+}
+
 .history-panel {
   display: flex;
   flex-direction: column;
