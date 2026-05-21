@@ -362,6 +362,8 @@ body {
   letter-spacing: 0.14em;
   font-family: var(--mono);
   text-transform: uppercase;
+  transform-origin: center;
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
 }
 
 .strategy-tone {
@@ -379,6 +381,8 @@ body {
   text-transform: uppercase;
   background: rgba(143, 163, 187, 0.08);
   color: var(--neutral);
+  transform-origin: center;
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
 }
 
 .strategy-tone.tone-bull {
@@ -434,6 +438,12 @@ body {
   width: 96px;
 }
 
+.strategy-flag:hover,
+.strategy-tone:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 1px rgba(255, 176, 0, 0.18), 0 8px 20px rgba(0, 0, 0, 0.22);
+}
+
 .strategy-body {
   margin: 0;
   color: #d6dfec;
@@ -479,6 +489,7 @@ body {
   padding: 12px;
   background: linear-gradient(180deg, rgba(14, 24, 38, 0.98) 0%, rgba(7, 13, 22, 1) 100%);
   box-shadow: none;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
 .card::before {
@@ -558,6 +569,19 @@ body {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
+  transform-origin: left center;
+  transition: transform 140ms ease, text-shadow 140ms ease;
+}
+
+.card:hover {
+  z-index: 2;
+  border-color: rgba(255, 176, 0, 0.34);
+  background: linear-gradient(180deg, rgba(18, 31, 47, 0.98) 0%, rgba(9, 16, 27, 1) 100%);
+}
+
+.card:hover .card-value {
+  transform: scale(1.14);
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.08);
 }
 
 .card-note {
