@@ -408,6 +408,15 @@ body {
   font-family: var(--mono);
 }
 
+.strategy-legend {
+  margin: 0 0 8px;
+  color: #7f93ad;
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  font-family: var(--mono);
+}
+
 .strategy-body {
   margin: 0;
   color: #d6dfec;
