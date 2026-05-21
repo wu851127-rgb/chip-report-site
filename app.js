@@ -174,7 +174,7 @@ function buildStrategyView(report) {
     toneLabel = "偏空";
   } else if (bcSettle !== null && bcSettle >= 1_000_000) {
     tone = "risk";
-    toneLabel = "警示";
+    toneLabel = "槓桿警示";
   }
 
   const indexPhrase =
