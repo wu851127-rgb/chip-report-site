@@ -447,9 +447,53 @@ body {
 .strategy-body {
   margin: 0;
   color: #d6dfec;
-  font-size: 12px;
-  line-height: 1.7;
+  font-size: 13.5px;
+  line-height: 1.95;
   font-family: "IBM Plex Sans", "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.strategy-body .desk-lead {
+  display: inline;
+  font-weight: 700;
+}
+
+.strategy-body .desk-lead.tone-bull,
+.strategy-body .desk-lead.tone-risk {
+  color: #f5f9ff;
+}
+
+.strategy-body .desk-lead.tone-bear {
+  color: #dbf7e5;
+}
+
+.strategy-body .desk-focus,
+.strategy-body .desk-bull,
+.strategy-body .desk-risk {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+}
+
+.strategy-body .desk-focus {
+  color: #ffd166;
+  background: rgba(255, 176, 0, 0.12);
+  border: 1px solid rgba(255, 176, 0, 0.18);
+}
+
+.strategy-body .desk-bull {
+  color: #ffb1ae;
+  background: rgba(255, 91, 87, 0.12);
+  border: 1px solid rgba(255, 91, 87, 0.18);
+}
+
+.strategy-body .desk-risk {
+  color: #ff97ae;
+  background: rgba(255, 45, 85, 0.16);
+  border: 1px solid rgba(255, 45, 85, 0.22);
 }
 
 .sections {

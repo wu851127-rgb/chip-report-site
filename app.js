@@ -128,6 +128,46 @@ function buildDeskViewBody(parts) {
     .trim();
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function stylizeStrategyBody(body, tone) {
+  let html = escapeHtml(body);
+  const replacements = [
+    { pattern: /雙紫爆/g, cls: "desk-risk" },
+    { pattern: /驚驚漲末段/g, cls: "desk-risk" },
+    { pattern: /高槓桿/g, cls: "desk-risk" },
+    { pattern: /回測整理/g, cls: "desk-risk" },
+    { pattern: /風險回收/g, cls: "desk-risk" },
+    { pattern: /部位調整/g, cls: "desk-risk" },
+    { pattern: /動態避險/g, cls: "desk-focus" },
+    { pattern: /逆勢布局/g, cls: "desk-bull" },
+    { pattern: /逆勢布局型態/g, cls: "desk-bull" },
+    { pattern: /積極偏多/g, cls: "desk-bull" },
+    { pattern: /偏多/g, cls: "desk-bull" },
+    { pattern: /5% 上下甚至更大的回測整理/g, cls: "desk-risk" },
+  ];
+
+  for (const { pattern, cls } of replacements) {
+    html = html.replace(pattern, (match) => `<span class="${cls}">${match}</span>`);
+  }
+
+  const sentences = html
+    .split(/(?<=。)/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+
+  if (sentences.length > 0) {
+    sentences[0] = `<span class="desk-lead tone-${tone}">${sentences[0]}</span>`;
+  }
+
+  return sentences.join("");
+}
+
 function buildStrategyView(report) {
   const cards = collectCards(report);
   const allCards = collectAllCards(report);
@@ -295,7 +335,7 @@ function renderStrategy(report) {
   }
   els.strategyTone.textContent = strategy.toneLabel;
   els.strategyTone.className = `strategy-tone tone-${strategy.tone}`;
-  els.strategyBody.textContent = strategy.body;
+  els.strategyBody.innerHTML = stylizeStrategyBody(strategy.body, strategy.tone);
 }
 
 function buildCard(card) {
