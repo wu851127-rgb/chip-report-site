@@ -168,6 +168,25 @@ function stylizeStrategyBody(body, tone) {
   return sentences.join("");
 }
 
+function renderStrategyBlocks(blocks, tone) {
+  return blocks
+    .filter((block) => block && block.text)
+    .map((block, index) => {
+      const label = escapeHtml(block.label ?? "");
+      const bodyHtml = stylizeStrategyBody(block.text, index === 0 ? tone : "neutral");
+      return `
+        <section class="strategy-block">
+          <div class="strategy-block-head">${label}</div>
+          <div class="strategy-block-body">
+            <div class="strategy-bullet"></div>
+            <div class="strategy-block-text">${bodyHtml}</div>
+          </div>
+        </section>
+      `;
+    })
+    .join("");
+}
+
 function buildStrategyView(report) {
   const cards = collectCards(report);
   const allCards = collectAllCards(report);
@@ -313,10 +332,29 @@ function buildStrategyView(report) {
     overheatView,
     conclusionView,
   ]);
+  const blocks = [
+    {
+      label: "盤面主軸",
+      text: buildDeskViewBody([tapeView, `${spotPhrase}。`]),
+    },
+    {
+      label: "外資期貨",
+      text: futuresView,
+    },
+    {
+      label: "選擇權槓桿",
+      text: buildDeskViewBody([optionsView, dealerRetailView, retailView, overheatView]),
+    },
+    {
+      label: "操作結論",
+      text: conclusionView,
+    },
+  ];
   return {
     tone,
     toneLabel,
     body,
+    blocks,
     flag: contrarianBullSignal ? "逆勢做多" : longSignal ? "多方異常" : "",
   };
 }
@@ -335,7 +373,7 @@ function renderStrategy(report) {
   }
   els.strategyTone.textContent = strategy.toneLabel;
   els.strategyTone.className = `strategy-tone tone-${strategy.tone}`;
-  els.strategyBody.innerHTML = stylizeStrategyBody(strategy.body, strategy.tone);
+  els.strategyBody.innerHTML = renderStrategyBlocks(strategy.blocks ?? [{ label: "Desk View", text: strategy.body }], strategy.tone);
 }
 
 function buildCard(card) {
