@@ -192,18 +192,32 @@ function buildStrategyView(report) {
   const allCards = collectAllCards(report);
   const indexChange = getCardValue(cards, "加權指數漲跌");
   const indexLevel = getCardValue(cards, "加權指數");
+  const pcr = getCardValue(cards, "PCR與結算比");
   const foreignSpot = getCardValue(cards, "外資現貨買賣超");
   const foreignFut = getCardValue(cards, "外資(大小台)期貨未平倉");
   const foreignFutDelta = getCardValue(cards, "外資期貨未平倉與前日增減");
   const foreignFutVsSettle = getCardValue(cards, "外資期貨未平倉與結算比");
   const bcSettle = getCardValue(cards, "外資(BC)OP未平倉金額與結算比");
+  const bpSettle = getCardValue(cards, "外資(BP)OP未平倉金額與結算比");
+  const foreignBuyOiLots = getCardValue(cards, "外資(買)OP未平倉口數");
+  const foreignSellOiLots = getCardValue(cards, "外資(賣)OP未平倉口數");
+  const foreignBuyOiAmount = getCardValue(cards, "外資(買)OP未平倉金額");
+  const foreignSellOiAmount = getCardValue(cards, "外資(賣)OP未平倉金額");
   const foreignCpRatio = getCardValue(cards, "外資買權/賣權比");
   const dealerCpRatio = getCardValue(cards, "自營買方買權/賣權比");
   const foreignScBcDelta = getCardValue(allCards, "外資(SC增幅-BC增幅)金額");
   const foreignScAmount = getCardValue(allCards, "外資SC金額");
   const foreignBcAmount = getCardValue(allCards, "外資BC金額");
+  const foreignBcScRatio = getCardValue(allCards, "外資BC/SC增幅比例");
+  const foreignBpAmount = getCardValue(allCards, "外資BP金額");
+  const foreignSpAmount = getCardValue(allCards, "外資SP金額");
+  const foreignBpSpRatio = getCardValue(allCards, "外資BP/SP增幅比例");
   const dealerBcSettle = getCardValue(cards, "自營(BC)OP未平倉金額與結算比");
   const dealerBpSettle = getCardValue(cards, "自營(BP)OP未平倉金額與結算比");
+  const dealerBuyOiAmount = getCardValue(cards, "自營(買)OP未平倉金額");
+  const dealerSellOiAmount = getCardValue(cards, "自營(賣)OP未平倉金額");
+  const dealerScBcDelta = getCardValue(allCards, "自營(SC增幅-BC增幅)金額");
+  const dealerBpSpRatio = getCardValue(allCards, "自營BP/SP增幅比例");
   const retailNet = getCardValue(cards, "散戶未平倉");
   const retailMicroNet = getCardValue(cards, "微台散戶未平倉");
   const retailMicroRatio = getCardValue(cards, "微台散戶多空比");
@@ -221,6 +235,9 @@ function buildStrategyView(report) {
     (retailMicroNet !== null && retailMicroNet > 0) ||
     (retailMicroRatio !== null && retailMicroRatio >= 15);
   const optionOverheatSignal = largeBcPosition && dealerHot;
+  const putDefenseSignal =
+    (bpSettle !== null && bpSettle > 0) ||
+    (foreignSellOiAmount !== null && foreignSellOiAmount > foreignBuyOiAmount);
 
   let score = 0;
   if (indexChange !== null) score += indexChange > 0 ? 1 : -1;
@@ -293,20 +310,32 @@ function buildStrategyView(report) {
   const tapeView =
     indexLevel === null
       ? `${indexPhrase}，盤面主軸仍需搭配現貨與衍生性商品確認。`
-      : `${indexPhrase}，指數收在 ${renderValue(indexLevel, "#,##0.00")}；光看日內漲跌只能判斷表面氣氛，真正關鍵仍是現貨、期貨與選擇權是否同向，或出現背離。`;
+      : indexChange !== null && foreignSpot !== null && indexChange > 0 && foreignSpot > 0
+        ? `${indexPhrase}，指數收在 ${renderValue(indexLevel, "#,##0.00")}；現貨與價格同向偏強，代表盤面不只是被權值硬拉，資金面也有跟進。${pcr !== null ? `PCR 來到 ${getCardRender(cards, "PCR與結算比")}，市場情緒仍偏樂觀。` : ""}`
+        : indexChange !== null && foreignSpot !== null && indexChange < 0 && foreignSpot < 0
+          ? `${indexPhrase}，指數收在 ${renderValue(indexLevel, "#,##0.00")}；現貨與價格同步走弱，盤面表象偏空，但是否轉成趨勢性回落，仍要看期貨與選擇權有沒有出現一致的防禦配置。${pcr !== null ? `PCR 為 ${getCardRender(cards, "PCR與結算比")}，可作為情緒強弱的輔助對照。` : ""}`
+          : `${indexPhrase}，指數收在 ${renderValue(indexLevel, "#,##0.00")}；價格與現貨流向出現背離，代表日內方向不宜只看收盤漲跌，仍需把衍生性商品部位一起放進來讀。${pcr !== null ? `PCR 目前為 ${getCardRender(cards, "PCR與結算比")}。` : ""}`;
   const futuresView =
     foreignFut === null || foreignFutDelta === null || foreignFutVsSettle === null
       ? `${futPhrase}。`
-      : `期貨端目前 ${getCardRender(cards, "外資(大小台)期貨未平倉")}、日變動 ${getCardRender(cards, "外資期貨未平倉與前日增減")}、與結算比 ${getCardRender(cards, "外資期貨未平倉與結算比")}；若空單在行情推進時仍持續堆高，較像外資用高流動性期貨做動態避險，不能單純把空單增加直接視為轉空確認。`;
+      : futuresHedgeExtreme
+        ? `期貨端目前來到 ${getCardRender(cards, "外資(大小台)期貨未平倉")}，日變動 ${getCardRender(cards, "外資期貨未平倉與前日增減")}、與結算比 ${getCardRender(cards, "外資期貨未平倉與結算比")}；這已屬明顯偏極端區，較像外資在強勢波段中用期貨做動態避險，後續觀察重點不是空單多寡本身，而是拉回時這些空單會不會開始回補。`
+        : foreignFutDelta > 0
+          ? `期貨端留倉為 ${getCardRender(cards, "外資(大小台)期貨未平倉")}，較前日增加 ${getCardRender(cards, "外資期貨未平倉與前日增減")}；空單續增雖會壓抑情緒，但若選擇權端沒有同步轉空，仍應優先解讀為避險增量。`
+          : `期貨端留倉為 ${getCardRender(cards, "外資(大小台)期貨未平倉")}，日變動 ${getCardRender(cards, "外資期貨未平倉與前日增減")}；若空單不再擴大甚至開始收斂，代表外資對下檔防禦的需求沒有再升級。`;
   const optionsView = largeBcPosition
-    ? `選擇權端外資 BC 部位仍處高槓桿區，${isSettlementResetDay ? "結算日雖使 BC 結算比重置，但原始 BC 金額仍偏大，代表部位並未真正降溫。" : `BC 結算比 ${getCardRender(cards, "外資(BC)OP未平倉金額與結算比")} 配合原始 BC 金額 ${renderValue(foreignBcAmount, "#,##0")} 顯示槓桿仍在高檔。`} ${expertLongPhrase}`
-    : `選擇權端目前外資買方比 ${getCardRender(cards, "外資買方買權/賣權比")}、淨買權/賣權比 ${getCardRender(cards, "外資買權/賣權比")}，整體偏向保留上方想像空間，但尚未進入極端失衡。`;
+    ? `外資選擇權核心仍在買權槓桿。${isSettlementResetDay ? `結算日使 BC 結算比歸零，但 BC 原始金額仍有 ${renderValue(foreignBcAmount, "#,##0")}，代表部位只是重置、不是退場。` : `BC 結算比 ${getCardRender(cards, "外資(BC)OP未平倉金額與結算比")}，原始 BC 金額 ${renderValue(foreignBcAmount, "#,##0")}；搭配買方比 ${getCardRender(cards, "外資買方買權/賣權比")} 與淨買權/賣權比 ${getCardRender(cards, "外資買權/賣權比")}，外資仍把槓桿押在上檔。`} ${foreignScBcDelta !== null && foreignScBcDelta < 0 ? `SC 減碼差 ${renderValue(foreignScBcDelta, "#,##0")} 顯示賣方買權同步縮手。` : ""} ${foreignBcScRatio !== null ? `BC/SC 增幅比例 ${renderValue(foreignBcScRatio, "0.00%")} 可視為買權主導度的延伸指標。` : ""}`
+    : putDefenseSignal
+      ? `外資買權槓桿沒有再明顯升溫，反而要留意賣權端的防禦配置。BP/SP 金額與增幅顯示保護性部位仍在，較像上方空間保留、下方風險同時控管的結構。`
+      : `外資選擇權沒有單邊失衡，買方比 ${getCardRender(cards, "外資買方買權/賣權比")}、淨買權/賣權比 ${getCardRender(cards, "外資買權/賣權比")}，目前偏向保留彈性，而不是直接押單邊行情。`;
   const dealerRetailView = dealerHot
-    ? `自營端買方比 ${getCardRender(cards, "自營買方買權/賣權比")}，已接近文章裡提到的過熱區觀察範圍；若外資與自營買權槓桿同步偏高，短線容易走成驚驚漲末段，後續需提防超漲後的快速整理。`
-    : `自營端買方比 ${getCardRender(cards, "自營買方買權/賣權比")}，目前仍可用來觀察券商是否同步堆高買權槓桿；若後續與外資訊號共振，才需要提高對短線過熱的警戒。`;
+    ? `自營端買方比 ${getCardRender(cards, "自營買方買權/賣權比")}，BC 結算比 ${getCardRender(cards, "自營(BC)OP未平倉金額與結算比")}；券商端也把買權槓桿推高，若再搭配自營 SC/BC 減碼差 ${dealerScBcDelta !== null ? renderValue(dealerScBcDelta, "#,##0") : "待補"}，就容易走成短線過熱。`
+    : dealerBuyOiAmount !== null && dealerSellOiAmount !== null
+      ? `自營端買方金額 ${renderValue(dealerBuyOiAmount, "#,##0")}、賣方金額 ${renderValue(dealerSellOiAmount, "#,##0")}，買方比 ${getCardRender(cards, "自營買方買權/賣權比")}；目前更像中性偏多的配平，而非過度擴張槓桿。`
+      : `自營端買權熱度目前尚未全面失控，可視為次要確認訊號；若後續與外資買權槓桿共振，才需要把短線過熱權重進一步拉高。`;
   const retailView = retailChasingLong
-    ? `散戶/微台部位已有追多跡象，這類現象依過往經驗多發生在行情末段或拉回前夕，代表情緒面開始追價，需同步留意修正風險是否升溫。`
-    : `散戶/微台目前尚未出現極端追價，代表情緒面還沒全面失控；若後續拉回時散戶多單反而放大，才是更值得警戒的末段訊號。`;
+    ? `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}、微台未平倉 ${retailMicroNet !== null ? renderValue(retailMicroNet, "#,##0") : "待補"}，微台多空比 ${retailMicroRatio !== null ? renderValue(retailMicroRatio, "0.00%") : "待補"}；情緒面已有追多痕跡，依歷史經驗較常出現在行情末段或回測前夕。`
+    : `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}、微台未平倉 ${retailMicroNet !== null ? renderValue(retailMicroNet, "#,##0") : "待補"}；目前還沒看到全面追價失控，這讓行情若要延續，結構上仍比較健康。`;
   const overheatView = optionOverheatSignal
     ? `若再把外資與自營買權槓桿一起看，現在已接近文章所說的「雙紫爆」輪廓；這通常不是單純看多確認，而是提醒短線漲勢可能已進入驚驚漲末段，後續較容易轉為 5% 上下甚至更大的回測整理。`
     : futuresHedgeExtreme
@@ -324,7 +353,6 @@ function buildStrategyView(report) {
 
   const body = buildDeskViewBody([
     tapeView,
-    `${spotPhrase}。`,
     futuresView,
     optionsView,
     dealerRetailView,
@@ -335,7 +363,7 @@ function buildStrategyView(report) {
   const blocks = [
     {
       label: "盤面主軸",
-      text: buildDeskViewBody([tapeView, `${spotPhrase}。`]),
+      text: tapeView,
     },
     {
       label: "外資期貨",
@@ -343,7 +371,11 @@ function buildStrategyView(report) {
     },
     {
       label: "選擇權槓桿",
-      text: buildDeskViewBody([optionsView, dealerRetailView, retailView, overheatView]),
+      text: buildDeskViewBody([optionsView, overheatView]),
+    },
+    {
+      label: "自營與散戶",
+      text: buildDeskViewBody([dealerRetailView, retailView]),
     },
     {
       label: "操作結論",
