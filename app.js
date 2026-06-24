@@ -1,6 +1,7 @@
 const state = {
   index: null,
   currentDate: null,
+  reportCache: new Map(),
 };
 
 const els = {
@@ -120,6 +121,31 @@ function getCardRender(cards, label) {
   return renderValue(card.value, card.numFmt ?? "");
 }
 
+function collectCardsFromReport(report) {
+  const entries = [];
+  for (const section of report?.dashboard?.sections ?? []) {
+    for (const card of section.cards ?? []) {
+      entries.push({ section: section.title, ...card });
+    }
+  }
+  return entries;
+}
+
+function collectAllCardsFromReport(report) {
+  const entries = collectCardsFromReport(report);
+  for (const section of report?.detail?.sections ?? []) {
+    for (const card of section.cards ?? []) {
+      entries.push({ section: section.title, ...card });
+    }
+  }
+  return entries;
+}
+
+function getReportCardValue(report, label, { detail = false } = {}) {
+  const cards = detail ? collectAllCardsFromReport(report) : collectCardsFromReport(report);
+  return getCardValue(cards, label);
+}
+
 function buildDeskViewBody(parts) {
   return parts
     .filter(Boolean)
@@ -140,8 +166,11 @@ function stylizeStrategyBody(body, tone) {
   const replacements = [
     { pattern: /雙紫爆/g, cls: "desk-risk" },
     { pattern: /驚驚漲末段/g, cls: "desk-risk" },
+    { pattern: /高檔整理/g, cls: "desk-risk" },
+    { pattern: /中期整理/g, cls: "desk-risk" },
     { pattern: /高槓桿/g, cls: "desk-risk" },
     { pattern: /回測整理/g, cls: "desk-risk" },
+    { pattern: /5-8%/g, cls: "desk-risk" },
     { pattern: /風險回收/g, cls: "desk-risk" },
     { pattern: /部位調整/g, cls: "desk-risk" },
     { pattern: /動態避險/g, cls: "desk-focus" },
@@ -149,6 +178,7 @@ function stylizeStrategyBody(body, tone) {
     { pattern: /逆勢布局型態/g, cls: "desk-bull" },
     { pattern: /積極偏多/g, cls: "desk-bull" },
     { pattern: /偏多/g, cls: "desk-bull" },
+    { pattern: /短線相對低點/g, cls: "desk-bull" },
     { pattern: /5% 上下甚至更大的回測整理/g, cls: "desk-risk" },
   ];
 
@@ -187,11 +217,12 @@ function renderStrategyBlocks(blocks, tone) {
     .join("");
 }
 
-function buildStrategyView(report, prevReport = null) {
+function buildStrategyView(report, historyReports = []) {
+  const recentReports = historyReports.length > 0 ? historyReports : [report];
+  const prevReport = recentReports[1] ?? null;
   const cards = collectCards(report);
   const allCards = collectAllCards(report);
   const prevCards = prevReport ? collectCards(prevReport) : [];
-  const prevAllCards = prevReport ? collectAllCards(prevReport) : [];
   const indexChange = getCardValue(cards, "加權指數漲跌");
   const indexLevel = getCardValue(cards, "加權指數");
   const pcr = getCardValue(cards, "PCR與結算比");
@@ -256,6 +287,41 @@ function buildStrategyView(report, prevReport = null) {
     retailMicroNet !== null && prevRetailMicroNet !== null ? retailMicroNet - prevRetailMicroNet : null;
   const futuresCovering =
     prevForeignFut !== null && foreignFut !== null ? foreignFut - prevForeignFut : foreignFutDelta;
+  const sameDirectionFuturesSignal =
+    indexChange !== null &&
+    foreignFutDelta !== null &&
+    ((indexChange > 0 && foreignFutDelta > 0) || (indexChange < 0 && foreignFutDelta < 0));
+  const contrarianFuturesSignal =
+    indexChange !== null &&
+    foreignFutDelta !== null &&
+    ((indexChange > 0 && foreignFutDelta < 0) || (indexChange < 0 && foreignFutDelta > 0));
+  const priorReports = recentReports.slice(1, 5);
+  const rallyReports = priorReports.filter((item) => {
+    const change = getReportCardValue(item, "加權指數漲跌");
+    return change !== null && change >= 500;
+  });
+  const priorBcAmounts = priorReports
+    .map((item) => getReportCardValue(item, "外資BC金額", { detail: true }))
+    .filter((value) => value !== null);
+  const priorScAmounts = priorReports
+    .map((item) => getReportCardValue(item, "外資SC金額", { detail: true }))
+    .filter((value) => value !== null);
+  const priorContrarianFuturesCount = recentReports.slice(0, 3).filter((item) => {
+    const change = getReportCardValue(item, "加權指數漲跌");
+    const delta = getReportCardValue(item, "外資期貨未平倉與前日增減");
+    return change !== null && delta !== null && ((change > 0 && delta < 0) || (change < 0 && delta > 0));
+  }).length;
+  const recentBcPeak = priorBcAmounts.length > 0 ? Math.max(...priorBcAmounts) : null;
+  const recentScPeak = priorScAmounts.length > 0 ? Math.max(...priorScAmounts) : null;
+  const bcStallScHoldSignal =
+    foreignBcAmount !== null &&
+    foreignScAmount !== null &&
+    rallyReports.length >= 2 &&
+    recentBcPeak !== null &&
+    recentScPeak !== null &&
+    foreignBcAmount <= recentBcPeak * 0.9 &&
+    foreignScAmount >= recentScPeak * 0.8 &&
+    foreignScAmount > foreignBcAmount;
   const panicWashoutSignal =
     retailDelta !== null && retailDelta < 0 && indexChange !== null && indexChange <= 0;
   const weakReboundOnly =
@@ -270,6 +336,8 @@ function buildStrategyView(report, prevReport = null) {
     foreignSpSignal &&
     futuresCovering !== null &&
     futuresCovering > 0;
+  const consolidationBiasSignal =
+    bcStallScHoldSignal || sameDirectionFuturesSignal;
 
   let score = 0;
   if (indexChange !== null) score += indexChange > 0 ? 1 : -1;
@@ -355,6 +423,10 @@ function buildStrategyView(report, prevReport = null) {
   const futuresView =
     foreignFut === null || foreignFutDelta === null || foreignFutVsSettle === null
       ? `${futPhrase}。`
+      : sameDirectionFuturesSignal
+        ? `期貨端目前 ${getCardRender(cards, "外資(大小台)期貨未平倉")}，與前日相比 ${getCardRender(cards, "外資期貨未平倉與前日增減")}；若這個增減方向與指數漲跌同步，依最新納入的研究框架，較應優先解讀為整理格局延續，而不是單靠收盤方向就判斷趨勢重新發動。`
+        : contrarianFuturesSignal || priorContrarianFuturesCount >= 2
+          ? `期貨端目前 ${getCardRender(cards, "外資(大小台)期貨未平倉")}，與前日相比 ${getCardRender(cards, "外資期貨未平倉與前日增減")}；若外資期貨在下跌時逆勢增加，且這種逆勢補倉能連續延伸數日，通常代表整理段的短線低點正在靠近，後續再搭配外資 SP 訊號會更有參考價值。`
       : strongerBottomSignal
         ? `期貨端目前 ${getCardRender(cards, "外資(大小台)期貨未平倉")}，與前日相比出現 ${getCardRender(cards, "外資期貨未平倉與前日增減")} 的逆勢回補；若搭配散戶多單下降與外資 SP 訊號同步出現，較接近跌深後的籌碼回穩，而不是單純空單洗價。`
         : weakReboundOnly
@@ -364,7 +436,9 @@ function buildStrategyView(report, prevReport = null) {
         : foreignFutDelta > 0
           ? `期貨端留倉為 ${getCardRender(cards, "外資(大小台)期貨未平倉")}，較前日增加 ${getCardRender(cards, "外資期貨未平倉與前日增減")}；空單續增雖會壓抑情緒，但若選擇權端沒有同步轉空，仍應優先解讀為避險增量。`
           : `期貨端留倉為 ${getCardRender(cards, "外資(大小台)期貨未平倉")}，日變動 ${getCardRender(cards, "外資期貨未平倉與前日增減")}；若空單不再擴大甚至開始收斂，代表外資對下檔防禦的需求沒有再升級。`;
-  const optionsView = largeBcPosition
+  const optionsView = bcStallScHoldSignal
+    ? `結算後的外資選擇權結構，較接近「BC 沒有跟著強漲有效擴張、SC 卻仍維持高水位」的壓縮型態。這種組合不宜直接解讀為全面翻空，反而更像多頭中的高檔整理或中期整理：上檔空間未必結束，但新一輪推升的速度通常會先放慢。`
+    : largeBcPosition
     ? `外資選擇權核心仍在買權槓桿。${isSettlementResetDay ? `結算日使 BC 結算比歸零，但 BC 原始金額仍有 ${renderValue(foreignBcAmount, "#,##0")}，代表部位只是重置、不是退場。` : `BC 結算比 ${getCardRender(cards, "外資(BC)OP未平倉金額與結算比")}，原始 BC 金額 ${renderValue(foreignBcAmount, "#,##0")}；搭配買方比 ${getCardRender(cards, "外資買方買權/賣權比")} 與淨買權/賣權比 ${getCardRender(cards, "外資買權/賣權比")}，外資仍把槓桿押在上檔。`} ${foreignScBcDelta !== null && foreignScBcDelta < 0 ? `SC 減碼差 ${renderValue(foreignScBcDelta, "#,##0")} 顯示賣方買權同步縮手。` : ""} ${foreignBcScRatio !== null ? `BC/SC 增幅比例 ${renderValue(foreignBcScRatio, "0.00%")} 可視為買權主導度的延伸指標。` : ""}`
     : foreignSpSignal
       ? `外資買權槓桿沒有再明顯升溫，但外資賣方部位已開始偏向 SP 訊號，代表保護性部位的性質正在轉變；若與散戶多單下降同步出現，通常比單看指數跌深更有參考價值。`
@@ -379,7 +453,7 @@ function buildStrategyView(report, prevReport = null) {
       ? `自營端買方金額 ${renderValue(dealerBuyOiAmount, "#,##0")}、賣方金額 ${renderValue(dealerSellOiAmount, "#,##0")}，買方比 ${getCardRender(cards, "自營買方買權/賣權比")}；目前更像中性偏多的配平，而非過度擴張槓桿。`
       : `自營端買權熱度目前尚未全面失控，可視為次要確認訊號；若後續與外資買權槓桿共振，才需要把短線過熱權重進一步拉高。`;
   const retailView = panicWashoutSignal
-    ? `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}，較前日 ${retailDelta !== null ? renderValue(retailDelta, "#,##0") : "待補"}；在大跌背景下反而減少多單，代表恐慌型部位開始鬆動，較容易形成短線相對低點。${retailMicroDelta !== null ? `微台未平倉變動 ${renderValue(retailMicroDelta, "#,##0")} 也可同步觀察情緒是否退潮。` : ""}`
+    ? `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}，較前日 ${retailDelta !== null ? renderValue(retailDelta, "#,##0") : "待補"}；在大跌背景下反而減少多單，代表恐慌型部位開始鬆動，較容易形成短線相對低點。若這類盤屬於波動更大、時間更長的整理段，研究上更重視「抄底後願意先縮手」這個訊號，而不是只看散戶多單是否衝到歷史高峰。${retailMicroDelta !== null ? `微台未平倉變動 ${renderValue(retailMicroDelta, "#,##0")} 也可同步觀察情緒是否退潮。` : ""}`
     : retailChasingLong
       ? `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}、微台未平倉 ${retailMicroNet !== null ? renderValue(retailMicroNet, "#,##0") : "待補"}，微台多空比 ${retailMicroRatio !== null ? renderValue(retailMicroRatio, "0.00%") : "待補"}；情緒面已有追多痕跡，依歷史經驗較常出現在行情末段或回測前夕。`
       : `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}、微台未平倉 ${retailMicroNet !== null ? renderValue(retailMicroNet, "#,##0") : "待補"}；目前還沒看到全面追價失控，這讓行情若要延續，結構上仍比較健康。`;
@@ -392,6 +466,8 @@ function buildStrategyView(report, prevReport = null) {
     ? `綜合來看，若跌幅已深、散戶多單明顯縮手、外資期貨開始回補且外資賣方訊號同步出現，較可把盤勢視為短線相對低點區，操作上可提高反彈延續的權重，但仍需用後續籌碼確認是否能從反彈升級為真正轉折。`
     : weakReboundOnly
       ? `綜合來看，這組籌碼較像先反彈、後整理：散戶恐慌有釋放，自營空單也提供短線支撐，但外資 SP 訊號與期貨逆增的延續仍不足，因此不宜太快把反彈直接上綱成 V 轉。`
+    : consolidationBiasSignal && !longSignal
+      ? `綜合來看，目前更像多頭架構裡的高檔整理，而不是結構性轉空。尤其當 BC 沒有跟漲擴張、SC 卻維持高檔，且外資期貨增減又與指數同步時，較應把它視為中期整理訊號；操作上重點是接受震盪與節奏切換，並預留約 5-8% 的回測整理空間，而不是急著把每一次拉回都解讀成空頭起跌。`
     : contrarianBullSignal
     ? `綜合來看，這不是單純因指數走弱就要看空的盤，而是表面偏弱、內部槓桿卻逆勢偏多的結構，較接近逆勢布局型態，因此 Desk View 會上修為積極偏多；操作上可偏向順多思考，但仍要提防高槓桿帶來的短線震盪。`
     : optionOverheatSignal && futuresHedgeExtreme
@@ -438,12 +514,12 @@ function buildStrategyView(report, prevReport = null) {
     toneLabel,
     body,
     blocks,
-    flag: contrarianBullSignal ? "逆勢做多" : longSignal ? "多方異常" : "",
+    flag: contrarianBullSignal ? "逆勢做多" : consolidationBiasSignal && !longSignal ? "高檔整理" : longSignal ? "多方異常" : "",
   };
 }
 
-function renderStrategy(report) {
-  const strategy = buildStrategyView(report);
+function renderStrategy(report, historyReports = []) {
+  const strategy = buildStrategyView(report, historyReports);
   els.strategyPanel.hidden = false;
   els.strategyPanel.classList.remove("tone-bull", "tone-bear", "tone-risk", "tone-neutral");
   els.strategyPanel.classList.add(`tone-${strategy.tone}`);
@@ -536,6 +612,21 @@ async function fetchJson(path) {
   return response.json();
 }
 
+async function fetchReport(date) {
+  if (state.reportCache.has(date)) return state.reportCache.get(date);
+  const report = await fetchJson(`./data/reports/${date}.json`);
+  state.reportCache.set(date, report);
+  return report;
+}
+
+async function loadHistoryReports(date, limit = 5) {
+  const dates = (state.index?.reports ?? []).map((item) => item.date);
+  const start = dates.indexOf(date);
+  if (start === -1) return [];
+  const slice = dates.slice(start, start + limit);
+  return Promise.all(slice.map((itemDate) => fetchReport(itemDate)));
+}
+
 async function loadIndex() {
   state.index = await fetchJson("./data/reports/index.json");
   const dateFromQuery = new URLSearchParams(window.location.search).get("date");
@@ -546,7 +637,8 @@ async function loadIndex() {
 }
 
 async function loadReport(date, updateQuery = true) {
-  const report = await fetchJson(`./data/reports/${date}.json`);
+  const report = await fetchReport(date);
+  const historyReports = await loadHistoryReports(date, 5);
   state.currentDate = date;
   if (updateQuery) {
     const url = new URL(window.location.href);
@@ -559,7 +651,7 @@ async function loadReport(date, updateQuery = true) {
   els.dashboardSummary.textContent = report.dashboard.summary ?? "";
   els.downloadLink.href = report.xlsxHref ?? "#";
 
-  renderStrategy(report);
+  renderStrategy(report, historyReports);
   renderSections(els.dashboardSections, report.dashboard.sections);
   renderSections(els.detailSections, report.detail.sections);
   renderStatus(state.index, state.currentDate);
