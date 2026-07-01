@@ -146,6 +146,11 @@ function getReportCardValue(report, label, { detail = false } = {}) {
   return getCardValue(cards, label);
 }
 
+function average(values) {
+  if (!values || values.length === 0) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 function buildDeskViewBody(parts) {
   return parts
     .filter(Boolean)
@@ -313,6 +318,21 @@ function buildStrategyView(report, historyReports = []) {
   }).length;
   const recentBcPeak = priorBcAmounts.length > 0 ? Math.max(...priorBcAmounts) : null;
   const recentScPeak = priorScAmounts.length > 0 ? Math.max(...priorScAmounts) : null;
+  const currentAndRecentReports = recentReports.slice(0, 5);
+  const recentIndexLevels = currentAndRecentReports
+    .map((item) => getReportCardValue(item, "加權指數"))
+    .filter((value) => value !== null);
+  const recentLow = recentIndexLevels.length > 0 ? Math.min(...recentIndexLevels) : null;
+  const recentHigh = recentIndexLevels.length > 0 ? Math.max(...recentIndexLevels) : null;
+  const recentIndexRange =
+    recentLow !== null && recentHigh !== null ? recentHigh - recentLow : null;
+  const recentAvgIndex = average(recentIndexLevels);
+  const trendAboveMeanSignal =
+    recentAvgIndex !== null && indexLevel !== null && indexLevel >= recentAvgIndex;
+  const priorDownShockSignal =
+    prevReport !== null &&
+    getReportCardValue(prevReport, "加權指數漲跌") !== null &&
+    getReportCardValue(prevReport, "加權指數漲跌") <= -1000;
   const bcStallScHoldSignal =
     foreignBcAmount !== null &&
     foreignScAmount !== null &&
@@ -322,6 +342,31 @@ function buildStrategyView(report, historyReports = []) {
     foreignBcAmount <= recentBcPeak * 0.9 &&
     foreignScAmount >= recentScPeak * 0.8 &&
     foreignScAmount > foreignBcAmount;
+  const boxDigestSignal =
+    recentIndexRange !== null &&
+    indexLevel !== null &&
+    recentIndexRange / Math.max(indexLevel, 1) <= 0.055 &&
+    rallyReports.length >= 1;
+  const whipsawReclaimSignal =
+    priorDownShockSignal &&
+    indexChange !== null &&
+    indexChange >= 800;
+  const sentimentMismatchSignal =
+    indexChange !== null &&
+    foreignSpot !== null &&
+    indexChange > 0 &&
+    foreignSpot < 0;
+  const optionCompressionSignal =
+    foreignBuyOiAmount !== null &&
+    foreignBuyOiAmount < 0 &&
+    foreignBcAmount !== null &&
+    foreignScAmount !== null &&
+    foreignScAmount > foreignBcAmount;
+  const continuationPrepSignal =
+    (bcStallScHoldSignal || optionCompressionSignal || boxDigestSignal) &&
+    trendAboveMeanSignal &&
+    !retailChasingLong &&
+    !putDefenseSignal;
   const panicWashoutSignal =
     retailDelta !== null && retailDelta < 0 && indexChange !== null && indexChange <= 0;
   const weakReboundOnly =
@@ -350,6 +395,8 @@ function buildStrategyView(report, historyReports = []) {
   if (panicWashoutSignal) score += 1;
   if (dealerShortOverheat) score += 1;
   if (foreignSpSignal) score += 1;
+  if (continuationPrepSignal) score += 1;
+  if (whipsawReclaimSignal) score += 1;
 
   const longSignal =
     largeBcPosition &&
@@ -445,6 +492,13 @@ function buildStrategyView(report, historyReports = []) {
     : putDefenseSignal
       ? `外資買權槓桿沒有再明顯升溫，反而要留意賣權端的防禦配置。BP/SP 金額與增幅顯示保護性部位仍在，較像上方空間保留、下方風險同時控管的結構。`
       : `外資選擇權沒有單邊失衡，買方比 ${getCardRender(cards, "外資買方買權/賣權比")}、淨買權/賣權比 ${getCardRender(cards, "外資買權/賣權比")}，目前偏向保留彈性，而不是直接押單邊行情。`;
+  const historyContextView = whipsawReclaimSignal
+    ? `從最新研究補進來的歷史對照看，這種「前一日急跌、隔日長紅回收」更像跌破後的急洗與回箱，而不是光靠一根大漲就能確認新主升。重點要看的是後面幾天能否站回恐慌日上緣，並讓外資期貨空單停止持續擴張；若只修復價格、不修復期權結構，通常仍屬震盪盤中的反抽。`
+    : continuationPrepSignal
+      ? `以這篇 6/30 報告的框架來看，現在更接近趨勢多頭裡的高檔橫盤消化，而不是結構性翻空。歷史上類似 2020 下半年到 2021 初、以及 2021 上半年區間整理的案例，常見特徵都是價格先走時間整理，外資買權不再追價擴張、SC 留在高檔控節奏，等乖離消化後才再找下一段續攻。`
+      : boxDigestSignal
+        ? `報告補強的一個重點是：高檔整理不能只看指數漲跌，而要看它是在趨勢上方做時間換空間，還是在跌勢裡被動反彈。若價格仍維持在近期均值之上、外資選擇權沒有全面轉成防禦部位，這種箱體更應先視為多頭中的節奏調整。`
+        : `這篇新報告提醒的是，Desk View 不能只用單日強弱去判斷方向，而要先把盤勢放進「主升段後整理、急跌後回箱、或高檔過熱延伸」這三種結構框架裡。也因此，之後解讀會更重視歷史位置、結算後籌碼重組、以及期權與散戶訊號是不是互相驗證。`;
   const dealerRetailView = dealerShortOverheat
     ? `自營端賣方部位偏熱，自營(賣)OP 未平倉金額 ${renderValue(dealerSellOiAmount, "#,##0")}、BP/SP 增幅比例 ${dealerBpSpRatio !== null ? renderValue(dealerBpSpRatio, "0.00%") : "待補"}；若同時散戶多單下降，這通常支持先有反彈，但若外資 SP 與期貨回補延續不足，仍要把後續整理視為主情境。`
     : dealerHot
@@ -462,10 +516,19 @@ function buildStrategyView(report, historyReports = []) {
     : futuresHedgeExtreme
       ? `目前外資期貨與結算比已來到相對極端區，雖然還不能直接視為反轉，但代表風險管理權重應提高，後續要盯的是拉回時外資期貨是否由空翻多。`
       : "";
+  const validationView = whipsawReclaimSignal
+    ? `接下來的驗證重點不是今天這根長紅本身，而是三件事：第一，外資期貨與前日增減是否不再續空；第二，外資 BC/SC 增幅比例能否持續改善，而不是只剩價格修復；第三，散戶與微台是否重新快速追價。若三者沒有同步轉熱，較適合把它解讀為跌深回箱後的震盪修復。`
+    : continuationPrepSignal
+      ? `接下來要驗證的不是「會不會立刻噴出」，而是整理能否乾淨完成：外資 BC 不失速、自營空方熱度別再升高、散戶不要重新衝高追多。若這幾項都維持克制，這種高檔盤整反而比較像為下一段趨勢做準備。`
+      : strongerBottomSignal
+        ? `後續驗證點會放在外資期貨回補能否延續、外資 SP 訊號是否保留，以及散戶縮手是否不是只有一天。只有這三者同時延續，短線低點的可信度才會提高。`
+        : `後續驗證點仍放在外資期貨日增減、BC/SC 與 BP/SP 增幅結構、以及散戶多單是否重新追價。也就是說，之後的 Desk View 會更像追蹤「結構有沒有升級」，而不是只重複形容單日漲跌。`;
   const conclusionView = strongerBottomSignal
     ? `綜合來看，若跌幅已深、散戶多單明顯縮手、外資期貨開始回補且外資賣方訊號同步出現，較可把盤勢視為短線相對低點區，操作上可提高反彈延續的權重，但仍需用後續籌碼確認是否能從反彈升級為真正轉折。`
     : weakReboundOnly
       ? `綜合來看，這組籌碼較像先反彈、後整理：散戶恐慌有釋放，自營空單也提供短線支撐，但外資 SP 訊號與期貨逆增的延續仍不足，因此不宜太快把反彈直接上綱成 V 轉。`
+    : whipsawReclaimSignal && sentimentMismatchSignal
+      ? `綜合來看，像 6/30 這種大漲並不屬於最乾淨的多頭再加速，因為現貨沒有同步大幅回補、外資期貨空單也仍在增加。更合理的解讀是急跌後的價格修復已出現，但籌碼端還在重整，所以 Desk View 會把它放在「中性偏多、先回箱再觀察能否續攻」的位置，而不是直接視為新主升確立。`
     : consolidationBiasSignal && !longSignal
       ? `綜合來看，目前更像多頭架構裡的高檔整理，而不是結構性轉空。尤其當 BC 沒有跟漲擴張、SC 卻維持高檔，且外資期貨增減又與指數同步時，較應把它視為中期整理訊號；操作上重點是接受震盪與節奏切換，並預留約 5-8% 的回測整理空間，而不是急著把每一次拉回都解讀成空頭起跌。`
     : contrarianBullSignal
@@ -480,17 +543,23 @@ function buildStrategyView(report, historyReports = []) {
 
   const body = buildDeskViewBody([
     tapeView,
+    historyContextView,
     futuresView,
     optionsView,
     dealerRetailView,
     retailView,
     overheatView,
+    validationView,
     conclusionView,
   ]);
   const blocks = [
     {
       label: "盤面主軸",
       text: tapeView,
+    },
+    {
+      label: "歷史定位",
+      text: historyContextView,
     },
     {
       label: "外資期貨",
@@ -505,6 +574,10 @@ function buildStrategyView(report, historyReports = []) {
       text: buildDeskViewBody([dealerRetailView, retailView]),
     },
     {
+      label: "驗證重點",
+      text: validationView,
+    },
+    {
       label: "操作結論",
       text: conclusionView,
     },
@@ -514,7 +587,17 @@ function buildStrategyView(report, historyReports = []) {
     toneLabel,
     body,
     blocks,
-    flag: contrarianBullSignal ? "逆勢做多" : consolidationBiasSignal && !longSignal ? "高檔整理" : longSignal ? "多方異常" : "",
+    flag: contrarianBullSignal
+      ? "逆勢做多"
+      : whipsawReclaimSignal
+        ? "急跌回箱"
+        : continuationPrepSignal
+          ? "整理待發"
+          : consolidationBiasSignal && !longSignal
+            ? "高檔整理"
+            : longSignal
+              ? "多方異常"
+              : "",
   };
 }
 
