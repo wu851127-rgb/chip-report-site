@@ -427,6 +427,31 @@ function buildStrategyView(report, historyReports = []) {
     toneLabel = "槓桿警示";
   }
 
+  let lensKey = "balanced";
+  let lensLabel = "平衡確認型";
+  if (contrarianBullSignal) {
+    lensKey = "divergence";
+    lensLabel = "背離布局型";
+  } else if (strongerBottomSignal) {
+    lensKey = "bottoming";
+    lensLabel = "跌深低點型";
+  } else if (panicWashoutSignal) {
+    lensKey = "washout";
+    lensLabel = "恐慌釋放型";
+  } else if (whipsawReclaimSignal) {
+    lensKey = "repair";
+    lensLabel = "修復觀察型";
+  } else if (continuationPrepSignal) {
+    lensKey = "accumulation";
+    lensLabel = "整理吸納型";
+  } else if (optionOverheatSignal && futuresHedgeExtreme) {
+    lensKey = "overheat";
+    lensLabel = "過熱降檔型";
+  } else if (bcStallScHoldSignal || sameDirectionFuturesSignal) {
+    lensKey = "compression";
+    lensLabel = "結構壓縮型";
+  }
+
   const indexPhrase =
     indexChange === null
       ? "指數方向待補"
@@ -541,45 +566,107 @@ function buildStrategyView(report, historyReports = []) {
         ? `綜合來看，當前籌碼尚未形成明顯逆勢多方共振，若現貨、期貨與選擇權同步轉弱，Desk View 會先以偏空或保守中性處理；操作上應優先看節奏與風險，而非單靠單一數值下注。`
         : `綜合來看，目前更像多空交錯、需要持續追蹤結算後籌碼延續性的階段，Desk View 先以 ${toneLabel} 定位；後續若外資 BC 槓桿、自營買權熱度與散戶追價同時升溫，則要同步評估超漲後的回測風險。`;
 
+  const thesisView =
+    lensKey === "divergence"
+      ? `今天的主命題不是順著表面強弱追價，而是辨認「表面偏弱、內部槓桿卻逆勢偏多」的背離布局。這種盤的核心不在當日紅黑 K，而在資金是否提前卡位未來修復。`
+      : lensKey === "bottoming"
+        ? `今天的主命題是檢查短線相對低點是否正在形成，而不是急著把所有反彈都升格成 V 轉。重點在跌幅、籌碼與情緒是否一起走到低點區。`
+        : lensKey === "washout"
+          ? `今天的主命題是恐慌是否正在被釋放。這類盤不能只看跌幅，而要看散戶是否縮手、外資是否不再擴大防禦，因為低點往往先出現在情緒退潮，而不是新聞轉好之後。`
+          : lensKey === "repair"
+            ? `今天的主命題是修復觀察。價格雖然快速回收，但現在更重要的是判斷它屬於跌深後回箱，還是真的足以開啟新一輪趨勢。`
+            : lensKey === "accumulation"
+              ? `今天的主命題是整理吸納，不是預測哪一天直接噴出。真正要處理的是，當中期架構仍偏多時，如何把等待寫成有條件的布局，而不是空泛觀望。`
+              : lensKey === "overheat"
+                ? `今天的主命題是過熱降檔。方向未必立刻翻空，但籌碼與情緒若都推到高檔，操作重點就會從追價切換成風險回收與節奏控管。`
+                : lensKey === "compression"
+                  ? `今天的主命題是結構壓縮。盤勢未明確轉空，但期貨與選擇權的組合也不支持你用最樂觀的劇本去解讀，這種時候更像是在替下一段方向做壓縮。`
+                  : `今天的主命題是平衡確認。眼前不是沒有訊號，而是訊號尚未集中到足以讓你押單邊，因此更需要把焦點放在結構是否升級，而不是替單日漲跌找理由。`;
+
+  const evidenceView = buildDeskViewBody(
+    lensKey === "divergence"
+      ? [tapeView, optionsView, futuresView, contrarianPhrase || expertLongPhrase]
+      : lensKey === "bottoming"
+        ? [retailView, futuresView, optionsView]
+        : lensKey === "washout"
+          ? [tapeView, retailView, dealerRetailView]
+          : lensKey === "repair"
+            ? [historyContextView, futuresView, optionsView]
+            : lensKey === "accumulation"
+              ? [historyContextView, optionsView, retailView]
+              : lensKey === "overheat"
+                ? [optionsView, overheatView, retailView, dealerRetailView]
+                : lensKey === "compression"
+                  ? [historyContextView, futuresView, optionsView]
+                  : [tapeView, futuresView, dealerRetailView, optionsView]
+  );
+
+  const riskView =
+    lensKey === "divergence"
+      ? `這一型最怕的是背離只維持一天。若外資 SC 很快回升、BC 槓桿失速，且期貨空單繼續同步擴大、散戶又開始追價，原本的逆勢布局就會被降級成單日異常。`
+      : lensKey === "bottoming"
+        ? `這一型最怕把反彈誤認成轉折。若外資期貨回補沒有延續、外資 SP 訊號很快消失，或散戶縮手只出現一天，那就更像先彈再整理，而不是低點確立。`
+        : lensKey === "washout"
+          ? `這一型最怕情緒雖退、結構卻沒穩。若現貨持續流出、外資防禦部位再升級，而跌幅又還沒走到預估區間，單靠散戶縮手還不足以支撐真正的低點判讀。`
+          : lensKey === "repair"
+            ? `這一型最怕只有價格修復、沒有籌碼修復。若後續站不回恐慌日上緣，或 BC/SC 結構沒有改善，這根長紅就更可能只是震盪盤中的回抽。`
+            : lensKey === "accumulation"
+              ? `這一型最怕整理拖太久後轉成分配。若 BC 續弱、SC 續強，自營與散戶又重新升高追價熱度，那原本的整理吸納就可能轉成高檔震盪甚至出貨。`
+              : lensKey === "overheat"
+                ? `這一型最怕還用趨勢思維放大槓桿。當外資買權、自營熱度與散戶追價都在高檔時，即便中期方向未壞，短線也很容易用回測把過熱清掉。`
+                : lensKey === "compression"
+                  ? `這一型最怕的是誤把壓縮看成穩定。若價格跌破近期均值、賣權防禦部位持續升級，代表壓縮後的方向可能不是往上，而是往下打開。`
+                  : `這一型最怕過早選邊。只要現貨、期貨、選擇權其中兩項開始出現同向共振，原本的平衡格局就會快速失效，屆時判讀要立即切到更明確的主命題。`;
+
+  const executionView =
+    lensKey === "divergence"
+      ? `部位節奏上，比較適合把等待變成試單與承接條件：可以接受小量順多，但不在情緒回暖的第一根長紅追價；真正加碼要等背離訊號延續，而不是只賭今天特殊。`
+      : lensKey === "bottoming"
+        ? `部位節奏上，這是可以考慮分批布局的區域，但前提是用確認換倉位，而不是一次押滿。若後續 1-3 天籌碼延續改善，再把反彈看成更高級別的轉折。`
+        : lensKey === "washout"
+          ? `部位節奏上，先等價格與籌碼一起走進預設劇本，不急著猜最低點。若跌幅、外資防禦收斂與散戶縮手同步到位，承接與加碼才有勝率優勢。`
+          : lensKey === "repair"
+            ? `部位節奏上，先把它當修復而不是新主升。可以把基本倉位慢慢拿回，但不把單日修復直接上綱成全面進攻；追價在這一型裡通常最吃虧。`
+            : lensKey === "accumulation"
+              ? `部位節奏上，重點是先把回測容忍區間與分批條件寫好，再等待市場把價格與籌碼一起送進來。也就是說，等待本身就是操作的一部分，而不是沒有觀點。`
+              : lensKey === "overheat"
+                ? `部位節奏上，這裡更偏向降槓桿、收回追價衝動、保留好部位等下一次拉回，而不是把高勝率的主升段思維硬套在過熱尾端。`
+                : lensKey === "compression"
+                  ? `部位節奏上，這裡適合以守為攻。可以保留觀察倉與核心倉，但新增部位需要等壓縮後的方向更清楚，而不是在資訊還混雜時先大幅表態。`
+                  : `部位節奏上，先保留彈性比急著下注更重要。當前更適合把倉位建立在條件觸發後，而不是建立在直覺或單一數值上。`;
+
   const body = buildDeskViewBody([
-    tapeView,
+    thesisView,
     historyContextView,
-    futuresView,
-    optionsView,
-    dealerRetailView,
-    retailView,
-    overheatView,
+    evidenceView,
+    riskView,
+    executionView,
     validationView,
-    conclusionView,
   ]);
   const blocks = [
     {
-      label: "盤面主軸",
-      text: tapeView,
+      label: "主命題",
+      text: thesisView,
     },
     {
       label: "歷史定位",
       text: historyContextView,
     },
     {
-      label: "外資期貨",
-      text: futuresView,
+      label: "支持證據",
+      text: evidenceView,
     },
     {
-      label: "選擇權槓桿",
-      text: buildDeskViewBody([optionsView, overheatView]),
+      label: "反證風險",
+      text: riskView,
     },
     {
-      label: "自營與散戶",
-      text: buildDeskViewBody([dealerRetailView, retailView]),
+      label: "部位節奏",
+      text: buildDeskViewBody([executionView, conclusionView]),
     },
     {
       label: "驗證重點",
       text: validationView,
-    },
-    {
-      label: "操作結論",
-      text: conclusionView,
     },
   ];
   return {
@@ -587,17 +674,22 @@ function buildStrategyView(report, historyReports = []) {
     toneLabel,
     body,
     blocks,
-    flag: contrarianBullSignal
-      ? "逆勢做多"
-      : whipsawReclaimSignal
-        ? "急跌回箱"
-        : continuationPrepSignal
-          ? "整理待發"
-          : consolidationBiasSignal && !longSignal
-            ? "高檔整理"
-            : longSignal
-              ? "多方異常"
-              : "",
+    flag:
+      lensKey === "divergence"
+        ? "背離布局"
+        : lensKey === "bottoming"
+          ? "低點測試"
+          : lensKey === "washout"
+            ? "恐慌釋放"
+            : lensKey === "repair"
+              ? "修復觀察"
+              : lensKey === "accumulation"
+                ? "整理吸納"
+                : lensKey === "overheat"
+                  ? "過熱降檔"
+                  : lensKey === "compression"
+                    ? "結構壓縮"
+                    : "",
   };
 }
 
