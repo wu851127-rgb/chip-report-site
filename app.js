@@ -367,6 +367,17 @@ function buildStrategyView(report, historyReports = []) {
     trendAboveMeanSignal &&
     !retailChasingLong &&
     !putDefenseSignal;
+  const consolidationRepairSignal =
+    sentimentMismatchSignal &&
+    indexChange !== null &&
+    Math.abs(indexChange) <= 150 &&
+    foreignFutDelta !== null &&
+    foreignFutDelta > 0 &&
+    foreignScBcDelta !== null &&
+    foreignScBcDelta < 0 &&
+    foreignBcScRatio !== null &&
+    foreignBcScRatio > 1 &&
+    !largeBcPosition;
   const panicWashoutSignal =
     retailDelta !== null && retailDelta < 0 && indexChange !== null && indexChange <= 0;
   const weakReboundOnly =
@@ -438,6 +449,9 @@ function buildStrategyView(report, historyReports = []) {
   } else if (panicWashoutSignal) {
     lensKey = "washout";
     lensLabel = "恐慌釋放型";
+  } else if (consolidationRepairSignal) {
+    lensKey = "repair";
+    lensLabel = "修復觀察型";
   } else if (whipsawReclaimSignal) {
     lensKey = "repair";
     lensLabel = "修復觀察型";
@@ -519,6 +533,8 @@ function buildStrategyView(report, historyReports = []) {
       : `外資選擇權沒有單邊失衡，買方比 ${getCardRender(cards, "外資買方買權/賣權比")}、淨買權/賣權比 ${getCardRender(cards, "外資買權/賣權比")}，目前偏向保留彈性，而不是直接押單邊行情。`;
   const historyContextView = whipsawReclaimSignal
     ? `從最新研究補進來的歷史對照看，這種「前一日急跌、隔日長紅回收」更像跌破後的急洗與回箱，而不是光靠一根大漲就能確認新主升。重點要看的是後面幾天能否站回恐慌日上緣，並讓外資期貨空單停止持續擴張；若只修復價格、不修復期權結構，通常仍屬震盪盤中的反抽。`
+    : consolidationRepairSignal
+      ? `若用 6/30 那篇對整理期的框架來看，這一型更像「整理盤裡的修復觀察」，不是新一輪主升，也不是單純轉弱。關鍵不在指數只小漲，而在外資 SC 明顯回落、BC/SC 結構改善，但外資現貨與期貨主結構仍未完全翻多，因此較合理的解讀是箱體內壓力稍鬆、短線修復條件變好，而不是突破已經確認。`
     : continuationPrepSignal
       ? `以這篇 6/30 報告的框架來看，現在更接近趨勢多頭裡的高檔橫盤消化，而不是結構性翻空。歷史上類似 2020 下半年到 2021 初、以及 2021 上半年區間整理的案例，常見特徵都是價格先走時間整理，外資買權不再追價擴張、SC 留在高檔控節奏，等乖離消化後才再找下一段續攻。`
       : boxDigestSignal
@@ -543,6 +559,8 @@ function buildStrategyView(report, historyReports = []) {
       : "";
   const validationView = whipsawReclaimSignal
     ? `接下來的驗證重點不是今天這根長紅本身，而是三件事：第一，外資期貨與前日增減是否不再續空；第二，外資 BC/SC 增幅比例能否持續改善，而不是只剩價格修復；第三，散戶與微台是否重新快速追價。若三者沒有同步轉熱，較適合把它解讀為跌深回箱後的震盪修復。`
+    : consolidationRepairSignal
+      ? `接下來 1-3 天真正要追的不是指數有沒有再多漲幾百點，而是三件事：第一，外資 SC 能不能繼續往下收，而不是很快回到高水位；第二，外資期貨未平倉與前日增減能否持續改善，代表空方避險沒有再升級；第三，現貨賣超是否明顯收斂。若只修價格、不修籌碼，這裡仍該先視為整理箱中的喘息，而不是新波段起跑。`
     : continuationPrepSignal
       ? `接下來要驗證的不是「會不會立刻噴出」，而是整理能否乾淨完成：外資 BC 不失速、自營空方熱度別再升高、散戶不要重新衝高追多。更實務地說，這裡應先把自己的回測容忍區間與分批條件設好，等待市場把價格與籌碼一起送進預期範圍，而不是在反彈日臨時改劇本去追價。若這幾項都維持克制，這種高檔盤整反而比較像為下一段趨勢做準備。`
       : strongerBottomSignal
@@ -552,6 +570,8 @@ function buildStrategyView(report, historyReports = []) {
     ? `綜合來看，若跌幅已深、散戶多單明顯縮手、外資期貨開始回補且外資賣方訊號同步出現，較可把盤勢視為短線相對低點區，操作上可提高反彈延續的權重，但仍需用後續籌碼確認是否能從反彈升級為真正轉折。`
     : weakReboundOnly
       ? `綜合來看，這組籌碼較像先反彈、後整理：散戶恐慌有釋放，自營空單也提供短線支撐，但外資 SP 訊號與期貨逆增的延續仍不足，因此不宜太快把反彈直接上綱成 V 轉。`
+    : consolidationRepairSignal
+      ? `綜合來看，這更像整理格局中的偏正面修復訊號。SC 的回落與 BC/SC 結構改善，代表上方壓力有鬆動；但外資現貨仍偏賣、期貨主結構仍偏空、買權淨額也還沒翻成積極進攻，所以 Desk View 會把它放在「中性偏多、先回箱再觀察」的位置。實務上較適合把它當成整理盤裡較有利的喘息點，而不是無條件追價的突破起跑。`
     : whipsawReclaimSignal && sentimentMismatchSignal
       ? `綜合來看，像 6/30 這種大漲並不屬於最乾淨的多頭再加速，因為現貨沒有同步大幅回補、外資期貨空單也仍在增加。更合理的解讀是急跌後的價格修復已出現，但籌碼端還在重整，所以 Desk View 會把它放在「中性偏多、先回箱再觀察能否續攻」的位置，而不是直接視為新主升確立。`
     : consolidationBiasSignal && !longSignal
