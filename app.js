@@ -2,6 +2,7 @@ const state = {
   index: null,
   currentDate: null,
   reportCache: new Map(),
+  researchFramework: null,
 };
 
 const els = {
@@ -222,7 +223,92 @@ function renderStrategyBlocks(blocks, tone) {
     .join("");
 }
 
-function buildStrategyView(report, historyReports = []) {
+function uniqueStrings(values) {
+  return [...new Set((values ?? []).filter((value) => typeof value === "string" && value.trim()))];
+}
+
+function compactSentences(values, limit = 2) {
+  return uniqueStrings(values)
+    .slice(0, limit)
+    .map((value) => value.trim().replace(/。?$/, "。"));
+}
+
+function deriveResearchTags(context) {
+  const tags = new Set([context.lensKey]);
+  if (context.lensKey === "bottoming") tags.add("washout");
+  if (context.lensKey === "washout") tags.add("bottoming");
+  if (context.lensKey === "repair") tags.add("repair");
+  if (context.lensKey === "accumulation" || context.lensKey === "compression") {
+    tags.add("accumulation");
+    tags.add("waiting");
+  }
+  if (context.lensKey === "divergence") tags.add("divergence");
+  if (context.optionOverheatSignal) {
+    tags.add("overheat");
+    tags.add("no_chase");
+  }
+  if (context.contrarianBullSignal) tags.add("divergence");
+  if (context.strongerBottomSignal || context.panicWashoutSignal) {
+    tags.add("bottoming");
+    tags.add("washout");
+  }
+  if (context.isSettlementResetDay || context.bcStallScHoldSignal) tags.add("settlement");
+  if (context.whipsawReclaimSignal) tags.add("repair");
+  return [...tags];
+}
+
+function buildResearchOverlay(framework, context) {
+  if (!framework) return null;
+  const archetype = framework.archetypes?.[context.lensKey] ?? null;
+  const tags = deriveResearchTags(context);
+  const matchedNotes = (framework.notes ?? []).filter((note) =>
+    (note.tags ?? []).some((tag) => tags.includes(tag))
+  );
+  const noteTitles = matchedNotes.slice(0, 2).map((note) => note.title.replace(/\s*研究筆記$/, ""));
+  const noteCorePoints = compactSentences(
+    matchedNotes.flatMap((note) => note.corePoints ?? []),
+    2
+  );
+  const noteDeskImpacts = compactSentences(
+    matchedNotes.flatMap((note) => note.deskViewImpacts ?? []),
+    2
+  );
+  const noteReminders = compactSentences(
+    matchedNotes.flatMap((note) => note.practicalReminders ?? []),
+    2
+  );
+  const principleHints = compactSentences(framework.principles ?? [], 2);
+
+  const frameworkView = archetype
+    ? `研究框架把今天先歸在「${archetype.label}」：${compactSentences([archetype.thesis, archetype.positioning], 2).join("")}`
+    : "";
+  const noteView =
+    noteTitles.length > 0 || noteCorePoints.length > 0
+      ? `對照研究庫${noteTitles.length > 0 ? `（${noteTitles.join("、")}）` : ""}，這類盤更該抓的是結構節奏，不是只跟著單日紅黑 K 解讀。${noteCorePoints.join("")}`
+      : "";
+  const evidenceAddon =
+    noteDeskImpacts.length > 0
+      ? `研究層的直接提醒是：${noteDeskImpacts.join("")}`
+      : "";
+  const riskAddon =
+    noteReminders.length > 0 || principleHints.length > 0
+      ? `研究層同步提醒：${compactSentences([...noteReminders, ...principleHints], 2).join("")}`
+      : "";
+  const validationAddon = compactSentences(
+    [archetype?.validationFocus, ...noteDeskImpacts],
+    2
+  ).join("");
+
+  return {
+    frameworkView,
+    noteView,
+    evidenceAddon,
+    riskAddon,
+    validationAddon,
+  };
+}
+
+function buildStrategyView(report, historyReports = [], researchFramework = null) {
   const recentReports = historyReports.length > 0 ? historyReports : [report];
   const prevReport = recentReports[1] ?? null;
   const cards = collectCards(report);
@@ -586,6 +672,17 @@ function buildStrategyView(report, historyReports = []) {
         ? `綜合來看，當前籌碼尚未形成明顯逆勢多方共振，若現貨、期貨與選擇權同步轉弱，Desk View 會先以偏空或保守中性處理；操作上應優先看節奏與風險，而非單靠單一數值下注。`
         : `綜合來看，目前更像多空交錯、需要持續追蹤結算後籌碼延續性的階段，Desk View 先以 ${toneLabel} 定位；後續若外資 BC 槓桿、自營買權熱度與散戶追價同時升溫，則要同步評估超漲後的回測風險。`;
 
+  const researchOverlay = buildResearchOverlay(researchFramework, {
+    lensKey,
+    optionOverheatSignal,
+    contrarianBullSignal,
+    strongerBottomSignal,
+    panicWashoutSignal,
+    isSettlementResetDay,
+    bcStallScHoldSignal,
+    whipsawReclaimSignal,
+  });
+
   const thesisView =
     lensKey === "divergence"
       ? `今天的主命題不是順著表面強弱追價，而是辨認「表面偏弱、內部槓桿卻逆勢偏多」的背離布局。這種盤的核心不在當日紅黑 K，而在資金是否提前卡位未來修復。`
@@ -657,28 +754,34 @@ function buildStrategyView(report, historyReports = []) {
 
   const body = buildDeskViewBody([
     thesisView,
+    researchOverlay?.frameworkView,
     historyContextView,
+    researchOverlay?.noteView,
     evidenceView,
+    researchOverlay?.evidenceAddon,
     riskView,
+    researchOverlay?.riskAddon,
     executionView,
+    conclusionView,
     validationView,
+    researchOverlay?.validationAddon,
   ]);
   const blocks = [
     {
       label: "主命題",
-      text: thesisView,
+      text: buildDeskViewBody([thesisView, researchOverlay?.frameworkView]),
     },
     {
       label: "歷史定位",
-      text: historyContextView,
+      text: buildDeskViewBody([historyContextView, researchOverlay?.noteView]),
     },
     {
       label: "支持證據",
-      text: evidenceView,
+      text: buildDeskViewBody([evidenceView, researchOverlay?.evidenceAddon]),
     },
     {
       label: "反證風險",
-      text: riskView,
+      text: buildDeskViewBody([riskView, researchOverlay?.riskAddon]),
     },
     {
       label: "部位節奏",
@@ -686,7 +789,7 @@ function buildStrategyView(report, historyReports = []) {
     },
     {
       label: "驗證重點",
-      text: validationView,
+      text: buildDeskViewBody([validationView, researchOverlay?.validationAddon]),
     },
   ];
   return {
@@ -714,7 +817,7 @@ function buildStrategyView(report, historyReports = []) {
 }
 
 function renderStrategy(report, historyReports = []) {
-  const strategy = buildStrategyView(report, historyReports);
+  const strategy = buildStrategyView(report, historyReports, state.researchFramework);
   els.strategyPanel.hidden = false;
   els.strategyPanel.classList.remove("tone-bull", "tone-bear", "tone-risk", "tone-neutral");
   els.strategyPanel.classList.add(`tone-${strategy.tone}`);
@@ -814,6 +917,14 @@ async function fetchReport(date) {
   return report;
 }
 
+async function loadResearchFramework() {
+  try {
+    return await fetchJson("./data/research/framework.json");
+  } catch (_error) {
+    return null;
+  }
+}
+
 async function loadHistoryReports(date, limit = 5) {
   const dates = (state.index?.reports ?? []).map((item) => item.date);
   const start = dates.indexOf(date);
@@ -823,6 +934,7 @@ async function loadHistoryReports(date, limit = 5) {
 }
 
 async function loadIndex() {
+  state.researchFramework = await loadResearchFramework();
   state.index = await fetchJson("./data/reports/index.json");
   const dateFromQuery = new URLSearchParams(window.location.search).get("date");
   state.currentDate = dateFromQuery || state.index.latestDate;

@@ -1,0 +1,550 @@
+{
+  "generatedAt": "2026-07-14T03:57:05.709251+00:00",
+  "articleCount": 5,
+  "noteCount": 6,
+  "principles": [
+    "外資期貨空單在上漲時增加，不等於單純看空，常是動態避險。",
+    "紫爆後的延伸段先視為超漲段，不當成新的安全追價區。",
+    "散戶追價增加，提高回測機率。",
+    "散戶縮手只能提升短線低點機率，不能單獨宣告落底。",
+    "`SP` 訊號要和外資期貨逆勢回補一起看，效果才完整。",
+    "在中期整理盤裡，日 K 的重要性低於籌碼是否照劇本變化。",
+    "當看不漲部位在短低點區下降時，可以提高承接權重；但反彈後若很快回升，就不能追價。"
+  ],
+  "workstyle": [
+    "原文放進 `research-library/articles/`",
+    "先整理成一篇 `notes/*.md`",
+    "再把新的觀點合併進這份總框架"
+  ],
+  "archetypes": {
+    "compression": {
+      "label": "結構壓縮型",
+      "setupSignals": [
+        "BC 不再有效擴張，SC 維持高水位",
+        "期貨日增減與指數漲跌同向，代表節奏仍偏整理"
+      ],
+      "thesis": "盤勢不是直接翻空，而是先把波動壓縮到足以醞釀下一段方向。",
+      "positioning": "新增部位要慢，先保留核心倉與觀察倉，等壓縮後方向更清楚。",
+      "riskFocus": "若賣權防禦部位持續升級、價格跌破近期均值，壓縮可能往下打開。",
+      "validationFocus": "觀察 BC/SC 是否續弱、期貨增減是否持續同向、以及現貨有無同步惡化。",
+      "tags": [
+        "compression",
+        "consolidation",
+        "waiting"
+      ],
+      "relatedNotes": [
+        {
+          "noteId": "2026-06-11-rebound-not-v-turn",
+          "title": "2026-06-11 研究筆記",
+          "subject": "急跌後的反彈確認，與「反彈不等於 V 轉」的條件判斷。"
+        },
+        {
+          "noteId": "2026-06-23-consolidation-framework",
+          "title": "2026-06-23 研究筆記",
+          "subject": "結算後 BC 弱、SC 高的中期整理框架。"
+        },
+        {
+          "noteId": "2026-07-03-waiting-as-positioning",
+          "title": "2026-07-03 研究筆記",
+          "subject": "等待不是空白，而是有條件的布局與節奏管理。"
+        }
+      ]
+    },
+    "washout": {
+      "label": "恐慌釋放型",
+      "setupSignals": [
+        "下跌日散戶多單下降",
+        "恐慌情緒鬆動，但底部結構未必完整"
+      ],
+      "thesis": "重點不是搶著宣告落底，而是辨認恐慌是否開始退潮。",
+      "positioning": "先用條件式承接，不急著一次押滿。",
+      "riskFocus": "若現貨續賣、外資防禦升級，單靠散戶縮手仍不足以構成低點。",
+      "validationFocus": "追蹤散戶縮手是否延續、外資期貨是否逆勢回補、以及 SP 訊號是否補上。",
+      "tags": [
+        "washout",
+        "bottoming",
+        "repair"
+      ],
+      "relatedNotes": [
+        {
+          "noteId": "2026-06-11-rebound-not-v-turn",
+          "title": "2026-06-11 研究筆記",
+          "subject": "急跌後的反彈確認，與「反彈不等於 V 轉」的條件判斷。"
+        },
+        {
+          "noteId": "2026-06-23-consolidation-framework",
+          "title": "2026-06-23 研究筆記",
+          "subject": "結算後 BC 弱、SC 高的中期整理框架。"
+        },
+        {
+          "noteId": "2026-07-03-waiting-as-positioning",
+          "title": "2026-07-03 研究筆記",
+          "subject": "等待不是空白，而是有條件的布局與節奏管理。"
+        }
+      ]
+    },
+    "balanced": {
+      "label": "平衡確認型",
+      "setupSignals": [
+        "現貨、期貨、選擇權尚未形成單邊共振",
+        "結構仍在等待更明確的升級訊號"
+      ],
+      "thesis": "眼前不是沒有訊號，而是訊號還沒集中到足以重押單邊。",
+      "positioning": "先保留彈性，條件沒到就不急著加速部位。",
+      "riskFocus": "只要兩到三組關鍵籌碼開始同向共振，原本的平衡格局就會快速失效。",
+      "validationFocus": "聚焦現貨方向、期貨增減、與選擇權淨額是否開始同向集中。",
+      "tags": [
+        "balanced",
+        "waiting"
+      ],
+      "relatedNotes": [
+        {
+          "noteId": "2026-05-12-overheat-and-correction",
+          "title": "2026-05-12 研究筆記",
+          "subject": "紫爆過熱、期貨避險升高、散戶追價後的修正結構。"
+        },
+        {
+          "noteId": "2026-06-23-consolidation-framework",
+          "title": "2026-06-23 研究筆記",
+          "subject": "結算後 BC 弱、SC 高的中期整理框架。"
+        },
+        {
+          "noteId": "2026-07-03-waiting-as-positioning",
+          "title": "2026-07-03 研究筆記",
+          "subject": "等待不是空白，而是有條件的布局與節奏管理。"
+        }
+      ]
+    },
+    "overheat": {
+      "label": "過熱降檔型",
+      "setupSignals": [
+        "外資與自營買權同步過熱",
+        "外資期貨未平倉與結算比處於高檔",
+        "散戶開始追價"
+      ],
+      "thesis": "中期方向不一定翻空",
+      "positioning": "但短線先談風險回收，不談無條件追價",
+      "riskFocus": "",
+      "validationFocus": "",
+      "tags": [
+        "no_chase",
+        "overheat",
+        "settlement"
+      ],
+      "relatedNotes": [
+        {
+          "noteId": "2026-05-12-overheat-and-correction",
+          "title": "2026-05-12 研究筆記",
+          "subject": "紫爆過熱、期貨避險升高、散戶追價後的修正結構。"
+        },
+        {
+          "noteId": "2026-06-01-purple-burst-extension",
+          "title": "2026-06-01 研究筆記",
+          "subject": "紫爆確認後的超漲延伸與部位調整。"
+        },
+        {
+          "noteId": "2026-06-11-rebound-not-v-turn",
+          "title": "2026-06-11 研究筆記",
+          "subject": "急跌後的反彈確認，與「反彈不等於 V 轉」的條件判斷。"
+        }
+      ]
+    },
+    "repair": {
+      "label": "修復觀察型",
+      "setupSignals": [
+        "急跌後出現強彈或回箱",
+        "散戶縮手、自營空單過熱、外資期貨逆勢回補，但底部訊號尚未完整"
+      ],
+      "thesis": "先視為反彈或修復，不直接升格成 V 轉",
+      "positioning": "核心是 `先反彈、後整理` 的容錯思維",
+      "riskFocus": "",
+      "validationFocus": "",
+      "tags": [
+        "accumulation",
+        "divergence",
+        "overheat",
+        "repair",
+        "washout"
+      ],
+      "relatedNotes": [
+        {
+          "noteId": "2026-06-11-rebound-not-v-turn",
+          "title": "2026-06-11 研究筆記",
+          "subject": "急跌後的反彈確認，與「反彈不等於 V 轉」的條件判斷。"
+        },
+        {
+          "noteId": "2026-07-03-waiting-as-positioning",
+          "title": "2026-07-03 研究筆記",
+          "subject": "等待不是空白，而是有條件的布局與節奏管理。"
+        }
+      ]
+    },
+    "bottoming": {
+      "label": "跌深低點型",
+      "setupSignals": [
+        "散戶多單下降",
+        "外資期貨逆勢增加且能延續",
+        "外資 `SP` 訊號同步出現"
+      ],
+      "thesis": "可提高相對低點與分批布局權重",
+      "positioning": "但仍需後續 1-3 天驗證，不可一天定生死",
+      "riskFocus": "",
+      "validationFocus": "",
+      "tags": [
+        "bottoming",
+        "divergence",
+        "repair",
+        "washout"
+      ],
+      "relatedNotes": [
+        {
+          "noteId": "2026-06-11-rebound-not-v-turn",
+          "title": "2026-06-11 研究筆記",
+          "subject": "急跌後的反彈確認，與「反彈不等於 V 轉」的條件判斷。"
+        },
+        {
+          "noteId": "2026-06-23-consolidation-framework",
+          "title": "2026-06-23 研究筆記",
+          "subject": "結算後 BC 弱、SC 高的中期整理框架。"
+        },
+        {
+          "noteId": "2026-07-03-waiting-as-positioning",
+          "title": "2026-07-03 研究筆記",
+          "subject": "等待不是空白，而是有條件的布局與節奏管理。"
+        }
+      ]
+    },
+    "accumulation": {
+      "label": "整理吸納型",
+      "setupSignals": [
+        "`BC` 不再追高擴張",
+        "`SC` 維持高水位",
+        "外資期貨與指數漲跌同向",
+        "結構更像高檔時間整理，而非結構性翻空"
+      ],
+      "thesis": "高點大概率未結束，但中間要接受 5-8% 回測",
+      "positioning": "等待是布局的一部分，不是沒有觀點",
+      "riskFocus": "",
+      "validationFocus": "",
+      "tags": [
+        "accumulation",
+        "compression",
+        "waiting"
+      ],
+      "relatedNotes": [
+        {
+          "noteId": "2026-05-12-overheat-and-correction",
+          "title": "2026-05-12 研究筆記",
+          "subject": "紫爆過熱、期貨避險升高、散戶追價後的修正結構。"
+        },
+        {
+          "noteId": "2026-06-11-rebound-not-v-turn",
+          "title": "2026-06-11 研究筆記",
+          "subject": "急跌後的反彈確認，與「反彈不等於 V 轉」的條件判斷。"
+        },
+        {
+          "noteId": "2026-06-23-consolidation-framework",
+          "title": "2026-06-23 研究筆記",
+          "subject": "結算後 BC 弱、SC 高的中期整理框架。"
+        }
+      ]
+    },
+    "divergence": {
+      "label": "背離布局型",
+      "setupSignals": [
+        "表面指數偏弱、外資現貨偏賣",
+        "但內部槓桿或買權結構逆勢改善"
+      ],
+      "thesis": "不能順著表面弱勢直接看空",
+      "positioning": "要提高槓桿端提早卡位的權重",
+      "riskFocus": "",
+      "validationFocus": "",
+      "tags": [
+        "divergence"
+      ],
+      "relatedNotes": [
+        {
+          "noteId": "2026-06-11-rebound-not-v-turn",
+          "title": "2026-06-11 研究筆記",
+          "subject": "急跌後的反彈確認，與「反彈不等於 V 轉」的條件判斷。"
+        },
+        {
+          "noteId": "2026-06-23-consolidation-framework",
+          "title": "2026-06-23 研究筆記",
+          "subject": "結算後 BC 弱、SC 高的中期整理框架。"
+        }
+      ]
+    },
+    "2026-07-03": {
+      "label": "2026-07-03 研究筆記",
+      "setupSignals": [
+        "來源：`2026-07-03_waiting-as-positioning.md`",
+        "候選主命題：待人工判定",
+        "可併入固定原則：當看不漲部位在短低點區下降時，可以提高承接權重；但反彈後若很快回升，就不能追價。；在中期整理盤裡，日 K 的重要性低於籌碼是否照劇本變化。",
+        "候選關鍵句：在中期整理 / 回測格局中，重點不只是價格跌到哪裡，而是盤後資料是否和原先劇本一致。",
+        "Desk View 強化方向：`等待` 必須被寫成具體條件，不可只寫成保守觀望。",
+        "節奏提醒：低點可布局，急漲不追價。"
+      ],
+      "thesis": "",
+      "positioning": "",
+      "riskFocus": "",
+      "validationFocus": "",
+      "tags": [
+        "accumulation",
+        "bottoming",
+        "no_chase",
+        "overheat",
+        "repair",
+        "waiting"
+      ],
+      "relatedNotes": []
+    },
+    "2026-06-23": {
+      "label": "2026-06-23 研究筆記",
+      "setupSignals": [
+        "來源：`2026-06-23_consolidation-framework.md`",
+        "候選主命題：整理吸納型 / 結構壓縮型",
+        "可併入固定原則：散戶縮手只能提升短線低點機率，不能單獨宣告落底。；`SP` 訊號要和外資期貨逆勢回補一起看，效果才完整。",
+        "候選關鍵句：結算後若 `BC` 在指數大漲時仍擴張有限，但 `SC` 持續維持高水位，較應解讀為 `中期整理`，而不是結構性轉空。",
+        "Desk View 強化方向：出現 `BC 不擴張 + SC 高水位` 時，Desk View 要優先切到 `整理吸納型` 或 `結構壓縮型`，而不是直接偏空。",
+        "節奏提醒：這種盤最容易因為日內震盪被誤判成翻空，但實際上常是高檔時間整理。"
+      ],
+      "thesis": "",
+      "positioning": "",
+      "riskFocus": "",
+      "validationFocus": "",
+      "tags": [
+        "accumulation",
+        "bottoming",
+        "compression",
+        "divergence",
+        "settlement",
+        "waiting",
+        "washout"
+      ],
+      "relatedNotes": []
+    },
+    "2026-06-11": {
+      "label": "2026-06-11 研究筆記",
+      "setupSignals": [
+        "來源：`2026-06-11_rebound-not-v-turn.md`",
+        "候選主命題：跌深低點型",
+        "可併入固定原則：散戶縮手只能提升短線低點機率，不能單獨宣告落底。；`SP` 訊號要和外資期貨逆勢回補一起看，效果才完整。",
+        "候選關鍵句：若市場大跌時，散戶多單反而下降，通常至少接近短線相對低點。",
+        "Desk View 強化方向：遇到急跌後單日強彈，Desk View 不能只寫「偏多反攻」，要先檢查是否只是 `反彈型修復`。",
+        "節奏提醒：把反彈當反彈來操作，通常比押 V 轉更有容錯率。"
+      ],
+      "thesis": "",
+      "positioning": "",
+      "riskFocus": "",
+      "validationFocus": "",
+      "tags": [
+        "bottoming",
+        "divergence",
+        "repair",
+        "waiting",
+        "washout"
+      ],
+      "relatedNotes": []
+    },
+    "2026-06-01": {
+      "label": "2026-06-01 研究筆記",
+      "setupSignals": [
+        "來源：`2026-06-01_purple-burst-extension.md`",
+        "候選主命題：過熱降檔型",
+        "可併入固定原則：散戶追價增加，提高回測機率。；紫爆後的延伸段先視為超漲段，不當成新的安全追價區。",
+        "候選關鍵句：外資期貨未平倉與結算比持續刷新，代表高點仍可延伸，但同時也讓紫爆訊號更完整。",
+        "Desk View 強化方向：當 `外資期貨未平倉與結算比` 與 `外資 BC` 同步刷新高檔時，Desk View 應先進入 `過熱降檔型` 或高風險多方狀態。",
+        "節奏提醒：紫爆後的操作核心是 `收回追價衝動`，而不是否定中期多頭。"
+      ],
+      "thesis": "",
+      "positioning": "",
+      "riskFocus": "",
+      "validationFocus": "",
+      "tags": [
+        "no_chase",
+        "overheat",
+        "settlement",
+        "waiting"
+      ],
+      "relatedNotes": []
+    },
+    "2026-05-12": {
+      "label": "2026-05-12 研究筆記",
+      "setupSignals": [
+        "來源：`2026-05-12_overheat-and-correction.md`",
+        "候選主命題：過熱降檔型",
+        "可併入固定原則：散戶追價增加，提高回測機率。；紫爆後的延伸段先視為超漲段，不當成新的安全追價區。",
+        "候選關鍵句：外資選擇權多單與自營選擇權多單同步進入極端高水位，短線超漲風險明顯提高。",
+        "Desk View 強化方向：當外資與自營買權同步過熱時，Desk View 必須優先談 `風險回收`，不能只寫偏多。",
+        "節奏提醒：紫爆後的額外上漲先視為超漲段，不能當成新的安全追價區。"
+      ],
+      "thesis": "",
+      "positioning": "",
+      "riskFocus": "",
+      "validationFocus": "",
+      "tags": [
+        "no_chase",
+        "overheat",
+        "waiting"
+      ],
+      "relatedNotes": []
+    }
+  },
+  "notes": [
+    {
+      "id": "2026-05-12-overheat-and-correction",
+      "title": "2026-05-12 研究筆記",
+      "source": "2026-05-12_overheat-and-correction.md",
+      "subject": "紫爆過熱、期貨避險升高、散戶追價後的修正結構。",
+      "corePoints": [
+        "外資選擇權多單與自營選擇權多單同步進入極端高水位，短線超漲風險明顯提高。",
+        "外資期貨空單在指數上漲、買權多單增加時持續上升，較應解讀為動態避險，而不是單純翻空。",
+        "`外資期貨未平倉與結算比` 的高點，是修正風險的重要觀察點。",
+        "散戶在驚驚漲末段開始追買，代表 5-8% 回測機率提高；若搭配更完整的極端過熱訊號，修正也可能擴大到 10-12%。",
+        "即使短線將修正，方向上仍偏向「修正後做多優於翻空追空」。"
+      ],
+      "deskViewImpacts": [
+        "當外資與自營買權同步過熱時，Desk View 必須優先談 `風險回收`，不能只寫偏多。",
+        "若外資期貨空單增加與指數上漲同時發生，不可直接寫成看空，要先用 `避險節奏` 解讀。",
+        "當散戶追價明顯升溫時，要提高 `末段追多 -> 回測風險` 的權重。"
+      ],
+      "practicalReminders": [
+        "紫爆後的額外上漲先視為超漲段，不能當成新的安全追價區。",
+        "若中期趨勢未毀，修正本身通常是部位調整與後續再布局的準備期。"
+      ],
+      "tags": [
+        "no_chase",
+        "overheat",
+        "settlement",
+        "waiting"
+      ]
+    },
+    {
+      "id": "2026-06-01-purple-burst-extension",
+      "title": "2026-06-01 研究筆記",
+      "source": "2026-06-01_purple-burst-extension.md",
+      "subject": "紫爆確認後的超漲延伸與部位調整。",
+      "corePoints": [
+        "外資期貨未平倉與結算比持續刷新，代表高點仍可延伸，但同時也讓紫爆訊號更完整。",
+        "外資買權金額再度進入紫爆區，意味紫爆後的新增漲幅應先視為 `超漲段`。",
+        "歷史上紫爆後再一路驚驚漲的延伸極少見，因此後續更應重視部位調整，而非單純追價。",
+        "紫爆後潛在回吐幅度大致可抓 `4-6%` 作為實務管理區間。"
+      ],
+      "deskViewImpacts": [
+        "當 `外資期貨未平倉與結算比` 與 `外資 BC` 同步刷新高檔時，Desk View 應先進入 `過熱降檔型` 或高風險多方狀態。",
+        "若市場還在漲，也不能把這種多頭寫成乾淨加速；應寫成 `趨勢未壞，但超漲段風險上升`。",
+        "要固定提醒後續觀察兩件事：",
+        "外資期貨是否在回測時由空翻多",
+        "散戶是否在修正時顯著增加多單"
+      ],
+      "practicalReminders": [
+        "紫爆後的操作核心是 `收回追價衝動`，而不是否定中期多頭。",
+        "Desk View 要把多頭方向與短線風險分開寫。"
+      ],
+      "tags": [
+        "no_chase",
+        "overheat",
+        "settlement"
+      ]
+    },
+    {
+      "id": "2026-06-11-rebound-not-v-turn",
+      "title": "2026-06-11 研究筆記",
+      "source": "2026-06-11_rebound-not-v-turn.md",
+      "subject": "急跌後的反彈確認，與「反彈不等於 V 轉」的條件判斷。",
+      "corePoints": [
+        "若市場大跌時，散戶多單反而下降，通常至少接近短線相對低點。",
+        "`開低走高 + 散戶多單下降 + 自營選擇權空單過熱 + 外資期貨逆勢增加`，更接近 `先反彈、後整理`。",
+        "不能直接升格成 V 轉的理由通常有三個：",
+        "散戶多單減少幅度還不夠大",
+        "外資選擇權尚未出現 `SP` 訊號",
+        "外資期貨逆勢增加的時間還不夠長",
+        "即使跌幅已接近 10-12%，若底部籌碼還不完整，仍要預留續跌資源。"
+      ],
+      "deskViewImpacts": [
+        "遇到急跌後單日強彈，Desk View 不能只寫「偏多反攻」，要先檢查是否只是 `反彈型修復`。",
+        "`散戶多單下降` 只能提高短線低點權重，不能單獨用來宣告落底。",
+        "只有當 `散戶縮手 + 外資 SP + 期貨逆勢回補延續` 同時成立，才可更積極上修為 `跌深低點型`。"
+      ],
+      "practicalReminders": [
+        "把反彈當反彈來操作，通常比押 V 轉更有容錯率。",
+        "Desk View 要清楚區分：",
+        "`短線支撐已出現`",
+        "`中期轉折已確認`"
+      ],
+      "tags": [
+        "accumulation",
+        "bottoming",
+        "divergence",
+        "overheat",
+        "repair",
+        "washout"
+      ]
+    },
+    {
+      "id": "2026-06-23-consolidation-framework",
+      "title": "2026-06-23 研究筆記",
+      "source": "2026-06-23_consolidation-framework.md",
+      "subject": "結算後 BC 弱、SC 高的中期整理框架。",
+      "corePoints": [
+        "結算後若 `BC` 在指數大漲時仍擴張有限，但 `SC` 持續維持高水位，較應解讀為 `中期整理`，而不是結構性轉空。",
+        "這類整理常見於大多頭中的中段消化，年內高點仍可能再刷新，但中間要預留 `5-8%` 回測空間。",
+        "外資期貨未平倉與前日增減若和指數漲跌 `同向`，整理格局機率提高。",
+        "若外資期貨在下跌時 `逆勢增加` 且連續延伸數日，短線低點通常接近。",
+        "在更大、更久的整理盤裡，散戶多單不是看絕對高點，而是看 `抄底後是否開始減少`。"
+      ],
+      "deskViewImpacts": [
+        "出現 `BC 不擴張 + SC 高水位` 時，Desk View 要優先切到 `整理吸納型` 或 `結構壓縮型`，而不是直接偏空。",
+        "要把 `同向期貨增減 -> 整理延續` 與 `逆向期貨增減 -> 短低點接近` 明確分開寫。",
+        "下跌時若再加上 `SP` 訊號，應提高 `整理尾端相對低點` 的權重。"
+      ],
+      "practicalReminders": [
+        "這種盤最容易因為日內震盪被誤判成翻空，但實際上常是高檔時間整理。",
+        "Desk View 要少寫「今天紅黑 K」，多寫「箱體內的籌碼定位與節奏」。"
+      ],
+      "tags": [
+        "accumulation",
+        "bottoming",
+        "compression",
+        "divergence",
+        "settlement",
+        "waiting"
+      ]
+    },
+    {
+      "id": "2026-07-03-waiting-as-positioning",
+      "title": "2026-07-03 研究筆記",
+      "source": "2026-07-03_waiting-as-positioning.md",
+      "subject": "等待不是空白，而是有條件的布局與節奏管理。",
+      "corePoints": [
+        "在中期整理 / 回測格局中，重點不只是價格跌到哪裡，而是盤後資料是否和原先劇本一致。",
+        "回測區間若已接近預估範圍，且籌碼變化也如預期，買進與加碼就應自然發生，不必等消息面轉好。",
+        "外資看不漲部位顯著下降，常對應整理期的短線低點；但高機率反彈後又快速回升，因此不可追價。",
+        "在 `紫框整理回測盤` 裡，綠紅日 K 的重要性低於：",
+        "能否在相對低點取得便宜部位",
+        "能否承受過程中的上下沖洗",
+        "即使判斷正確，整理盤仍有運氣成分；操作結論要兼顧節奏與心態。"
+      ],
+      "deskViewImpacts": [
+        "`等待` 必須被寫成具體條件，不可只寫成保守觀望。",
+        "當結構判斷是整理盤時，要明講：",
+        "哪些籌碼條件會觸發承接",
+        "為什麼反彈日不適合追價",
+        "後續若反彈後看不漲部位再回升，應如何降速"
+      ],
+      "practicalReminders": [
+        "低點可布局，急漲不追價。",
+        "Desk View 的語氣要能同時容納正確判斷與操作中的不確定性。"
+      ],
+      "tags": [
+        "accumulation",
+        "bottoming",
+        "no_chase",
+        "overheat",
+        "repair",
+        "waiting"
+      ]
+    }
+  ]
+}
