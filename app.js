@@ -238,7 +238,7 @@ function deriveResearchTags(context) {
   if (context.lensKey === "bottoming") tags.add("washout");
   if (context.lensKey === "washout") tags.add("bottoming");
   if (context.lensKey === "repair") tags.add("repair");
-  if (context.lensKey === "accumulation" || context.lensKey === "compression") {
+  if (context.lensKey === "accumulation") {
     tags.add("accumulation");
     tags.add("waiting");
   }
@@ -480,6 +480,10 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
     futuresCovering > 0;
   const consolidationBiasSignal =
     bcStallScHoldSignal || sameDirectionFuturesSignal;
+  const lateStageConsolidationSignal =
+    consolidationBiasSignal &&
+    optionCompressionSignal &&
+    !strongerBottomSignal;
 
   let score = 0;
   if (indexChange !== null) score += indexChange > 0 ? 1 : -1;
@@ -548,8 +552,8 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
     lensKey = "overheat";
     lensLabel = "過熱降檔型";
   } else if (bcStallScHoldSignal || sameDirectionFuturesSignal) {
-    lensKey = "compression";
-    lensLabel = "結構壓縮型";
+    lensKey = "accumulation";
+    lensLabel = "整理吸納型";
   }
 
   const indexPhrase =
@@ -621,6 +625,8 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
     ? `以急跌回箱框架來看，這種「前一日急跌、隔日長紅回收」更像跌破後的急洗與回箱，而不是光靠一根大漲就能確認新主升。重點要看的是後面幾天能否站回恐慌日上緣，並讓外資期貨空單停止持續擴張；若只修復價格、不修復期權結構，通常仍屬震盪盤中的反抽。`
     : consolidationRepairSignal
       ? `以整理期框架來看，今天更像箱體內的修復段，而不是趨勢重新發動。盤面重點不在指數僅小幅收紅，而在外資 SC 水位明顯下滑、BC/SC 結構同步改善，代表上方壓力已有鬆動；但現貨賣超與期貨偏空底色仍在，因此現階段較適合定義成「整理中的正向修復」，而非突破確認。`
+    : lateStageConsolidationSignal
+      ? `以最新納入的整理研究框架來看，這一型更接近「SC 單獨過熱後的中期整理中後段」，而不是單純偏空。也就是說，當 BC 不再擴張、買方選擇權淨額轉弱、期貨增減又與指數同向時，籌碼表面雖然變差，但更合理的解讀是整理已走到壓縮區，市場仍在等最後一次更乾淨的低點確認。`
     : continuationPrepSignal
       ? `以高檔整理消化框架來看，現在更接近趨勢多頭裡的橫盤消化，而不是結構性翻空。歷史上類似 2020 下半年到 2021 初、以及 2021 上半年區間整理的案例，常見特徵都是價格先走時間整理，外資買權不再追價擴張、SC 留在高檔控節奏，等乖離消化後才再找下一段續攻。`
       : boxDigestSignal
@@ -649,6 +655,8 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
       ? `後續 1-3 天的驗證焦點，不是指數還能再彈多少，而是籌碼修復能否延續。第一，看外資 SC 是否續降而非快速回補；第二，看外資期貨未平倉與前日增減能否持續改善，確認避險需求沒有再升級；第三，看現貨賣超是否同步收斂。若價格反彈而這三項沒有跟上，就仍應把本段視為整理箱中的修復，而不是新攻擊波。`
     : continuationPrepSignal
       ? `接下來要驗證的不是「會不會立刻噴出」，而是整理能否乾淨完成：外資 BC 不失速、自營空方熱度別再升高、散戶不要重新衝高追多。更實務地說，這裡應先把自己的回測容忍區間與分批條件設好，等待市場把價格與籌碼一起送進預期範圍，而不是在反彈日臨時改劇本去追價。若這幾項都維持克制，這種高檔盤整反而比較像為下一段趨勢做準備。`
+    : lateStageConsolidationSignal
+      ? `接下來的驗證重點要回到三件事：第一，外資 SP 訊號是否真正出現；第二，外資期貨是否在下跌或震盪時逆勢增加多單，且不是只出現一天；第三，散戶抄底部位是否開始降溫。若這三項沒有共振，就先把今天視為整理中後段的壓力測試，而不是低點確認。`
       : strongerBottomSignal
         ? `後續驗證點會放在外資期貨回補能否延續、外資 SP 訊號是否保留，以及散戶縮手是否不是只有一天。只有這三者同時延續，短線低點的可信度才會提高。`
         : `後續驗證點仍放在外資期貨日增減、BC/SC 與 BP/SP 增幅結構、以及散戶多單是否重新追價。也就是說，之後的 Desk View 會更像追蹤「結構有沒有升級」，而不是只重複形容單日漲跌；等待本身也會被寫成一種有條件的操作，而不是空泛觀望。`;
@@ -661,7 +669,7 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
     : whipsawReclaimSignal && sentimentMismatchSignal
       ? `綜合來看，像 6/30 這種大漲並不屬於最乾淨的多頭再加速，因為現貨沒有同步大幅回補、外資期貨空單也仍在增加。更合理的解讀是急跌後的價格修復已出現，但籌碼端還在重整，所以 Desk View 會把它放在「中性偏多、先回箱再觀察能否續攻」的位置，而不是直接視為新主升確立。`
     : consolidationBiasSignal && !longSignal
-      ? `綜合來看，目前更像多頭架構裡的高檔整理，而不是結構性轉空。尤其當 BC 沒有跟漲擴張、SC 卻維持高檔，且外資期貨增減又與指數同步時，較應把它視為中期整理訊號；操作上重點是接受震盪與節奏切換，預留約 5-8% 的回測整理空間，並把買進與加碼條件先寫好，等價格和籌碼一起到位，而不是急著把每一次拉回都解讀成空頭起跌，或在反彈日追價。`
+      ? `綜合來看，目前更像整理吸納型下的中期整理延續，而不是結構性轉空。尤其當 BC 沒有再擴張、SC 維持高水位、買方選擇權淨額轉弱，且外資期貨增減又與指數同步時，較應把它視為整理中後段的壓力測試。這種盤的重點不是急著猜最低點，而是接受籌碼會先變難看，並等待 SP 與外資期貨逆勢回補是否補上；在那之前，低接可分批，急彈不追價。`
     : contrarianBullSignal
     ? `綜合來看，這不是單純因指數走弱就要看空的盤，而是表面偏弱、內部槓桿卻逆勢偏多的結構，較接近逆勢布局型態，因此 Desk View 會上修為積極偏多；操作上可偏向順多思考，但仍要提防高槓桿帶來的短線震盪。`
     : optionOverheatSignal && futuresHedgeExtreme
@@ -693,11 +701,11 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
           : lensKey === "repair"
             ? `今天的主命題是修復觀察。價格雖然快速回收，但現在更重要的是判斷它屬於跌深後回箱，還是真的足以開啟新一輪趨勢。`
             : lensKey === "accumulation"
-              ? `今天的主命題是整理吸納，不是預測哪一天直接噴出。真正要處理的是，當中期架構仍偏多時，如何把等待寫成有條件的布局，而不是空泛觀望。`
+              ? lateStageConsolidationSignal
+                ? `今天的主命題是整理吸納，但位置更偏中期整理的中後段壓縮，不是直接預測今天就是最低點。真正要處理的是：籌碼雖然轉差，但這種轉差究竟是趨勢毀損，還是整理尾聲前的壓力測試。`
+                : `今天的主命題是整理吸納，不是預測哪一天直接噴出。真正要處理的是，當中期架構仍偏多時，如何把等待寫成有條件的布局，而不是空泛觀望。`
               : lensKey === "overheat"
                 ? `今天的主命題是過熱降檔。方向未必立刻翻空，但籌碼與情緒若都推到高檔，操作重點就會從追價切換成風險回收與節奏控管。`
-                : lensKey === "compression"
-                  ? `今天的主命題是結構壓縮。盤勢未明確轉空，但期貨與選擇權的組合也不支持你用最樂觀的劇本去解讀，這種時候更像是在替下一段方向做壓縮。`
                   : `今天的主命題是平衡確認。眼前不是沒有訊號，而是訊號尚未集中到足以讓你押單邊，因此更需要把焦點放在結構是否升級，而不是替單日漲跌找理由。`;
 
   const evidenceView = buildDeskViewBody(
@@ -711,10 +719,8 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
             ? [historyContextView, futuresView, optionsView]
             : lensKey === "accumulation"
               ? [historyContextView, optionsView, retailView]
-              : lensKey === "overheat"
-                ? [optionsView, overheatView, retailView, dealerRetailView]
-                : lensKey === "compression"
-                  ? [historyContextView, futuresView, optionsView]
+            : lensKey === "overheat"
+              ? [optionsView, overheatView, retailView, dealerRetailView]
                   : [tapeView, futuresView, dealerRetailView, optionsView]
   );
 
@@ -726,13 +732,13 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
         : lensKey === "washout"
           ? `這一型最怕情緒雖退、結構卻沒穩。若現貨持續流出、外資防禦部位再升級，而跌幅又還沒走到預估區間，單靠散戶縮手還不足以支撐真正的低點判讀。`
           : lensKey === "repair"
-            ? `這一型最怕只有價格修復、沒有籌碼修復。若後續站不回恐慌日上緣，或 BC/SC 結構沒有改善，這根長紅就更可能只是震盪盤中的回抽。`
+          ? `這一型最怕只有價格修復、沒有籌碼修復。若後續站不回恐慌日上緣，或 BC/SC 結構沒有改善，這根長紅就更可能只是震盪盤中的回抽。`
             : lensKey === "accumulation"
-              ? `這一型最怕整理拖太久後轉成分配。若 BC 續弱、SC 續強，自營與散戶又重新升高追價熱度，那原本的整理吸納就可能轉成高檔震盪甚至出貨。`
+              ? lateStageConsolidationSignal
+                ? `這一型最怕的是把短線跌深或反彈，過早當成低點確認。若後續仍看不到外資 SP 訊號、外資期貨也沒有逆勢增多並延續，且散戶抄底熱度不降，那就代表整理尚未完成，原本的吸納判讀也不能升級成跌深低點型。`
+                : `這一型最怕整理拖太久後轉成分配。若 BC 續弱、SC 續強，自營與散戶又重新升高追價熱度，那原本的整理吸納就可能轉成高檔震盪甚至出貨。`
               : lensKey === "overheat"
                 ? `這一型最怕還用趨勢思維放大槓桿。當外資買權、自營熱度與散戶追價都在高檔時，即便中期方向未壞，短線也很容易用回測把過熱清掉。`
-                : lensKey === "compression"
-                  ? `這一型最怕的是誤把壓縮看成穩定。若價格跌破近期均值、賣權防禦部位持續升級，代表壓縮後的方向可能不是往上，而是往下打開。`
                   : `這一型最怕過早選邊。只要現貨、期貨、選擇權其中兩項開始出現同向共振，原本的平衡格局就會快速失效，屆時判讀要立即切到更明確的主命題。`;
 
   const executionView =
@@ -743,13 +749,13 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
         : lensKey === "washout"
           ? `部位節奏上，先等價格與籌碼一起走進預設劇本，不急著猜最低點。若跌幅、外資防禦收斂與散戶縮手同步到位，承接與加碼才有勝率優勢。`
           : lensKey === "repair"
-            ? `部位節奏上，先把它當修復而不是新主升。可以把基本倉位慢慢拿回，但不把單日修復直接上綱成全面進攻；追價在這一型裡通常最吃虧。`
+          ? `部位節奏上，先把它當修復而不是新主升。可以把基本倉位慢慢拿回，但不把單日修復直接上綱成全面進攻；追價在這一型裡通常最吃虧。`
             : lensKey === "accumulation"
-              ? `部位節奏上，重點是先把回測容忍區間與分批條件寫好，再等待市場把價格與籌碼一起送進來。也就是說，等待本身就是操作的一部分，而不是沒有觀點。`
+              ? lateStageConsolidationSignal
+                ? `部位節奏上，這一型更適合保留可承受的核心倉與分批承接空間，而不是因為籌碼難看就全退，也不是看到單日強彈就回頭追價。等待在這裡不是空白，而是明確保留資金，等 SP 與外資期貨逆勢回補這種更高勝率的落底條件出現。`
+                : `部位節奏上，重點是先把回測容忍區間與分批條件寫好，再等待市場把價格與籌碼一起送進來。也就是說，等待本身就是操作的一部分，而不是沒有觀點。`
               : lensKey === "overheat"
                 ? `部位節奏上，這裡更偏向降槓桿、收回追價衝動、保留好部位等下一次拉回，而不是把高勝率的主升段思維硬套在過熱尾端。`
-                : lensKey === "compression"
-                  ? `部位節奏上，這裡適合以守為攻。可以保留觀察倉與核心倉，但新增部位需要等壓縮後的方向更清楚，而不是在資訊還混雜時先大幅表態。`
                   : `部位節奏上，先保留彈性比急著下注更重要。當前更適合把倉位建立在條件觸發後，而不是建立在直覺或單一數值上。`;
 
   const body = buildDeskViewBody([
@@ -810,8 +816,6 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
                 ? "整理吸納"
                 : lensKey === "overheat"
                   ? "過熱降檔"
-                  : lensKey === "compression"
-                    ? "結構壓縮"
                     : "",
   };
 }
