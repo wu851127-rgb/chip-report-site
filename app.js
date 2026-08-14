@@ -197,7 +197,7 @@ function buildRetailPositionFromHistory(historyReports) {
     sampleCount: samples.length,
     minimumSamples: 20,
     basis: "小台＋微台等值口數；微台 5 口換算為 1 口小台等值。",
-    rankFormula: "中位秩百分位 = (低於本日筆數 + 同值筆數 / 2) / 樣本數 x 100。",
+    rankFormula: "近45日相對位階（同值取中間排名）= (低於本日筆數 + 同值筆數 / 2) / 樣本數 x 100。",
     assessment,
     metrics,
   };
@@ -992,7 +992,7 @@ function buildRetailPositionPanel(position) {
 
   const note = document.createElement("p");
   note.className = "retail-position-note";
-  note.textContent = `${position.rankFormula ?? ""} 高位階代表部位較擁擠，僅作為風險與情緒觀察，不能單獨當成買賣訊號。`;
+  note.textContent = `近45日相對位階（同值取中間排名）= (低於本日筆數 + 同值筆數 / 2) / 樣本數 x 100。高位階代表部位較擁擠，僅作為風險與情緒觀察，不能單獨當成買賣訊號。`;
   panel.appendChild(note);
   return panel;
 }
