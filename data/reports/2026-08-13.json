@@ -4,7 +4,7 @@
   "xlsxHref": "./outputs/chip-report/台股盤後籌碼_2026-08-13.xlsx",
   "dashboard": {
     "title": "台股盤後籌碼儀表板 2026-08-13",
-    "subtitle": "本次為 2026-08-13 正式版，已補入 TWSE 與 TAIFEX 官方數據；加權指數當日高低差使用 TWSE MI_5MINS_HIST 官方資料，散戶與微台欄位沿用全市場 OI 減三大法人多空單的原表邏輯回推。",
+    "subtitle": "本次為 2026-08-13 正式版，已補入 TWSE 與 TAIFEX 官方數據；散戶位階採 45 日中位秩分位，並以小台部位 + 微台部位/5 換算等值口數。",
     "sections": [
       {
         "row": 4,
@@ -246,6 +246,48 @@
         "row": 90,
         "title": "散戶",
         "fill": "eef7e8",
+        "retailPosition": {
+          "window": 45,
+          "sampleCount": 45,
+          "minimumSamples": 20,
+          "basis": "小台＋微台等值口數；微台 5 口換算為 1 口小台等值。",
+          "rankFormula": "中位秩百分位 = (低於本日筆數 + 同值筆數 / 2) / 樣本數 x 100。",
+          "assessment": "未見極端擁擠",
+          "metrics": [
+            {
+              "key": "equivalentLong",
+              "label": "散戶多方位階",
+              "value": 18.9,
+              "current": 40863,
+              "formula": "小台散戶看多 + 微台散戶看多 / 5",
+              "crowding": "多方擁擠"
+            },
+            {
+              "key": "equivalentShort",
+              "label": "散戶空方位階",
+              "value": 50,
+              "current": 30377.4,
+              "formula": "小台散戶看空 + 微台散戶看空 / 5",
+              "crowding": "空方擁擠"
+            },
+            {
+              "key": "equivalentNet",
+              "label": "散戶淨多空位階",
+              "value": 21.1,
+              "current": 10485.599999999999,
+              "formula": "小台＋微台等值多單 - 小台＋微台等值空單",
+              "crowding": "淨多偏高"
+            },
+            {
+              "key": "microRatio",
+              "label": "微台多空比位階",
+              "value": 5.6,
+              "current": 15.58345731876958,
+              "formula": "微台散戶多空比",
+              "crowding": "微台追價偏熱"
+            }
+          ]
+        },
         "cards": [
           {
             "label": "散戶看多",
@@ -294,6 +336,56 @@
             "value": 12883,
             "note": "62,925 - 50,042",
             "numFmt": "#,##0"
+          },
+          {
+            "label": "小台+微台等值多單",
+            "value": 40863,
+            "note": "28,278 + 62,925 / 5；微台 5 口換算 1 口小台等值",
+            "numFmt": "#,##0.0"
+          },
+          {
+            "label": "小台+微台等值空單",
+            "value": 30377.4,
+            "note": "20,369 + 50,042 / 5；微台 5 口換算 1 口小台等值",
+            "numFmt": "#,##0.0"
+          },
+          {
+            "label": "小台+微台等值淨多空",
+            "value": 10485.599999999999,
+            "note": "40,863.0 - 30,377.4",
+            "numFmt": "#,##0.0"
+          },
+          {
+            "label": "散戶多方位階(45日)",
+            "value": 18.9,
+            "note": "中位秩百分位 = (低於本日筆數 + 同值筆數 / 2) / 樣本數 x 100。 小台＋微台等值口數；微台 5 口換算為 1 口小台等值。；目前樣本 45 筆。",
+            "numFmt": "0.0",
+            "alert": false,
+            "alertLabel": null
+          },
+          {
+            "label": "散戶空方位階(45日)",
+            "value": 50,
+            "note": "中位秩百分位 = (低於本日筆數 + 同值筆數 / 2) / 樣本數 x 100。 小台＋微台等值口數；微台 5 口換算為 1 口小台等值。；目前樣本 45 筆。",
+            "numFmt": "0.0",
+            "alert": false,
+            "alertLabel": null
+          },
+          {
+            "label": "散戶淨多空位階(45日)",
+            "value": 21.1,
+            "note": "中位秩百分位 = (低於本日筆數 + 同值筆數 / 2) / 樣本數 x 100。 小台＋微台等值口數；微台 5 口換算為 1 口小台等值。；目前樣本 45 筆。",
+            "numFmt": "0.0",
+            "alert": false,
+            "alertLabel": null
+          },
+          {
+            "label": "微台多空比位階(45日)",
+            "value": 5.6,
+            "note": "中位秩百分位 = (低於本日筆數 + 同值筆數 / 2) / 樣本數 x 100。 小台＋微台等值口數；微台 5 口換算為 1 口小台等值。；目前樣本 45 筆。",
+            "numFmt": "0.0",
+            "alert": false,
+            "alertLabel": null
           }
         ]
       }

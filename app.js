@@ -345,6 +345,10 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
   const retailNet = getCardValue(cards, "散戶未平倉");
   const retailMicroNet = getCardValue(cards, "微台散戶未平倉");
   const retailMicroRatio = getCardValue(cards, "微台散戶多空比");
+  const retailLongRank = getCardValue(cards, "散戶多方位階(45日)");
+  const retailShortRank = getCardValue(cards, "散戶空方位階(45日)");
+  const retailNetRank = getCardValue(cards, "散戶淨多空位階(45日)");
+  const microRatioRank = getCardValue(cards, "微台多空比位階(45日)");
   const prevRetailNet = getCardValue(prevCards, "散戶未平倉");
   const prevRetailMicroNet = getCardValue(prevCards, "微台散戶未平倉");
   const prevForeignFut = getCardValue(prevCards, "外資(大小台)期貨未平倉");
@@ -360,7 +364,12 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
   const retailChasingLong =
     (retailNet !== null && retailNet > 0) ||
     (retailMicroNet !== null && retailMicroNet > 0) ||
-    (retailMicroRatio !== null && retailMicroRatio >= 15);
+    (retailMicroRatio !== null && retailMicroRatio >= 15) ||
+    (retailLongRank !== null && retailLongRank >= 80) ||
+    (microRatioRank !== null && microRatioRank >= 80);
+  const retailCrowdedLong = retailLongRank !== null && retailLongRank >= 80;
+  const retailCrowdedShort = retailShortRank !== null && retailShortRank >= 80;
+  const retailLeverageCrowded = retailCrowdedLong && retailCrowdedShort;
   const optionOverheatSignal = largeBcPosition && dealerHot;
   const putDefenseSignal =
     (bpSettle !== null && bpSettle > 0) ||
@@ -639,11 +648,20 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
     : dealerBuyOiAmount !== null && dealerSellOiAmount !== null
       ? `自營端買方金額 ${renderValue(dealerBuyOiAmount, "#,##0")}、賣方金額 ${renderValue(dealerSellOiAmount, "#,##0")}，買方比 ${getCardRender(cards, "自營買方買權/賣權比")}；目前更像中性偏多的配平，而非過度擴張槓桿。`
       : `自營端買權熱度目前尚未全面失控，可視為次要確認訊號；若後續與外資買權槓桿共振，才需要把短線過熱權重進一步拉高。`;
+  const retailPositionView = retailLeverageCrowded
+    ? `散戶位階顯示多方 ${renderValue(retailLongRank, "0.0")}%、空方 ${renderValue(retailShortRank, "0.0")}%，屬雙向槓桿偏高；優先防範波動放大，不可把單一位階當成方向訊號。`
+    : retailCrowdedLong
+      ? `散戶等值多單位階 ${renderValue(retailLongRank, "0.0")}%、微台比位階 ${microRatioRank !== null ? `${renderValue(microRatioRank, "0.0")}%` : "—"}，多方部位偏擁擠；這是追價與回測風險提醒，不單獨構成偏空結論。`
+      : retailCrowdedShort
+        ? `散戶等值空單位階 ${renderValue(retailShortRank, "0.0")}% 偏高；價格一旦止穩應留意軋空彈性，但不單獨構成偏多結論。`
+        : retailNetRank !== null
+          ? `散戶 45 日位階未見極端擁擠（淨多空位階 ${renderValue(retailNetRank, "0.0")}%）；結構是否延續仍以外資期貨與選擇權為主。`
+          : "散戶位階樣本尚在累積，暫不以此作為方向判斷。";
   const retailView = panicWashoutSignal
-    ? `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}，較前日 ${retailDelta !== null ? renderValue(retailDelta, "#,##0") : "待補"}；在大跌背景下反而減少多單，代表恐慌型部位開始鬆動，較容易形成短線相對低點。若這類盤屬於波動更大、時間更長的整理段，研究上更重視「抄底後願意先縮手」這個訊號，而不是只看散戶多單是否衝到歷史高峰。${retailMicroDelta !== null ? `微台未平倉變動 ${renderValue(retailMicroDelta, "#,##0")} 也可同步觀察情緒是否退潮。` : ""}`
+    ? `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}，較前日 ${retailDelta !== null ? renderValue(retailDelta, "#,##0") : "待補"}；在大跌背景下反而減少多單，代表恐慌型部位開始鬆動，較容易形成短線相對低點。若這類盤屬於波動更大、時間更長的整理段，研究上更重視「抄底後願意先縮手」這個訊號，而不是只看散戶多單是否衝到歷史高峰。${retailMicroDelta !== null ? `微台未平倉變動 ${renderValue(retailMicroDelta, "#,##0")} 也可同步觀察情緒是否退潮。` : ""} ${retailPositionView}`
     : retailChasingLong
-      ? `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}、微台未平倉 ${retailMicroNet !== null ? renderValue(retailMicroNet, "#,##0") : "待補"}，微台多空比 ${retailMicroRatio !== null ? renderValue(retailMicroRatio, "0.00%") : "待補"}；情緒面已有追多痕跡，依歷史經驗較常出現在行情末段或回測前夕。`
-      : `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}、微台未平倉 ${retailMicroNet !== null ? renderValue(retailMicroNet, "#,##0") : "待補"}；目前還沒看到全面追價失控，這讓行情若要延續，結構上仍比較健康。`;
+      ? `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}、微台未平倉 ${retailMicroNet !== null ? renderValue(retailMicroNet, "#,##0") : "待補"}，微台多空比 ${retailMicroRatio !== null ? renderValue(retailMicroRatio, "0.00%") : "待補"}；情緒面已有追多痕跡，依歷史經驗較常出現在行情末段或回測前夕。${retailPositionView}`
+      : `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}、微台未平倉 ${retailMicroNet !== null ? renderValue(retailMicroNet, "#,##0") : "待補"}；目前還沒看到全面追價失控，這讓行情若要延續，結構上仍比較健康。${retailPositionView}`;
   const overheatView = optionOverheatSignal
     ? `若再把外資與自營買權槓桿一起看，現在已接近文章所說的「雙紫爆」輪廓；這通常不是單純看多確認，而是提醒短線漲勢可能已進入驚驚漲末段，後續較容易轉為 5% 上下甚至更大的回測整理。`
     : futuresHedgeExtreme
@@ -858,10 +876,77 @@ function buildCard(card) {
   return node;
 }
 
+function buildRetailPositionPanel(position) {
+  if (!position || !Array.isArray(position.metrics)) return null;
+
+  const panel = document.createElement("aside");
+  panel.className = "retail-position-panel";
+  panel.setAttribute("aria-label", "散戶位階圖");
+
+  const head = document.createElement("div");
+  head.className = "retail-position-head";
+  const title = document.createElement("div");
+  title.className = "retail-position-title";
+  title.textContent = "散戶位階圖";
+  const meta = document.createElement("div");
+  meta.className = "retail-position-meta";
+  meta.textContent = `${position.window ?? 45} 日樣本 / ${position.sampleCount ?? 0} 筆 / 小台＋微台等值口數`;
+  head.append(title, meta);
+
+  const assessment = document.createElement("div");
+  const assessmentTone = String(position.assessment ?? "").includes("擁擠") ? "is-risk" : "is-neutral";
+  assessment.className = `retail-position-assessment ${assessmentTone}`;
+  assessment.textContent = position.assessment ?? "樣本不足";
+  head.appendChild(assessment);
+  panel.appendChild(head);
+
+  const grid = document.createElement("div");
+  grid.className = "retail-position-grid";
+  for (const metric of position.metrics) {
+    const item = document.createElement("article");
+    item.className = `retail-meter retail-meter-${metric.key ?? "neutral"}`;
+    const metricHead = document.createElement("div");
+    metricHead.className = "retail-meter-head";
+    const label = document.createElement("span");
+    label.textContent = metric.label ?? "位階";
+    const rank = numericValue(metric.value);
+    const value = document.createElement("strong");
+    value.textContent = rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}%`;
+    metricHead.append(label, value);
+    item.appendChild(metricHead);
+
+    const track = document.createElement("div");
+    track.className = "retail-meter-track";
+    const fill = document.createElement("span");
+    fill.className = "retail-meter-fill";
+    fill.style.width = `${Math.max(0, Math.min(100, rank ?? 0))}%`;
+    track.appendChild(fill);
+    item.appendChild(track);
+
+    const caption = document.createElement("p");
+    const current = numericValue(metric.current);
+    const currentText = metric.key === "microRatio"
+      ? `${current === null ? "—" : renderValue(current, "0.00") + "%"}`
+      : `${current === null ? "—" : renderValue(current, "#,##0.0")} 口`;
+    caption.textContent = `現值 ${currentText} / ${metric.formula ?? ""}`;
+    item.appendChild(caption);
+    grid.appendChild(item);
+  }
+  panel.appendChild(grid);
+
+  const note = document.createElement("p");
+  note.className = "retail-position-note";
+  note.textContent = `${position.rankFormula ?? ""} 高位階代表部位較擁擠，僅作為風險與情緒觀察，不能單獨當成買賣訊號。`;
+  panel.appendChild(note);
+  return panel;
+}
+
 function buildSection(section) {
   const node = els.sectionTemplate.content.firstElementChild.cloneNode(true);
   node.querySelector("h3").textContent = section.title ?? "";
   const grid = node.querySelector(".card-grid");
+  const retailPanel = buildRetailPositionPanel(section.retailPosition);
+  if (retailPanel) grid.before(retailPanel);
   for (const card of section.cards ?? []) {
     grid.appendChild(buildCard(card));
   }
