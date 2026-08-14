@@ -147,6 +147,62 @@ function getReportCardValue(report, label, { detail = false } = {}) {
   return getCardValue(cards, label);
 }
 
+function buildRetailPositionFromHistory(historyReports) {
+  const requiredLabels = ["散戶看多", "散戶看空", "微台散戶看多", "微台散戶看空", "微台散戶多空比"];
+  const samples = historyReports
+    .slice(0, 45)
+    .map((report) => {
+      const values = Object.fromEntries(requiredLabels.map((label) => [label, getReportCardValue(report, label)]));
+      return requiredLabels.every((label) => values[label] !== null) ? values : null;
+    })
+    .filter(Boolean);
+  const current = samples[0];
+  if (!current) return null;
+
+  const equivalentLong = (values) => values["散戶看多"] + values["微台散戶看多"] / 5;
+  const equivalentShort = (values) => values["散戶看空"] + values["微台散戶看空"] / 5;
+  const equivalentNet = (values) => equivalentLong(values) - equivalentShort(values);
+  const metricDefinitions = [
+    ["equivalentLong", "散戶多方位階", equivalentLong, "小台散戶看多 + 微台散戶看多 / 5", "多方擁擠"],
+    ["equivalentShort", "散戶空方位階", equivalentShort, "小台散戶看空 + 微台散戶看空 / 5", "空方擁擠"],
+    ["equivalentNet", "散戶淨多空位階", equivalentNet, "小台＋微台等值多單 - 小台＋微台等值空單", "淨多偏高"],
+    ["microRatio", "微台多空比位階", (values) => values["微台散戶多空比"], "微台散戶多空比", "微台追價偏熱"],
+  ];
+  const canRank = samples.length >= 20;
+  const metrics = metricDefinitions.map(([key, label, calculate, formula, crowding]) => {
+    const currentValue = calculate(current);
+    const values = samples.map(calculate);
+    const below = values.filter((value) => value < currentValue).length;
+    const equal = values.filter((value) => value === currentValue).length;
+    return {
+      key,
+      label,
+      value: canRank ? Math.round(((below + equal / 2) / values.length) * 1000) / 10 : null,
+      current: currentValue,
+      formula,
+      crowding,
+    };
+  });
+  const longRank = metrics[0].value;
+  const shortRank = metrics[1].value;
+  const assessment = longRank !== null && shortRank !== null && longRank >= 80 && shortRank >= 80
+    ? "雙向槓桿偏高"
+    : longRank !== null && longRank >= 80
+      ? "多方擁擠"
+      : shortRank !== null && shortRank >= 80
+        ? "空方擁擠"
+        : canRank ? "未見極端擁擠" : "樣本不足";
+  return {
+    window: 45,
+    sampleCount: samples.length,
+    minimumSamples: 20,
+    basis: "小台＋微台等值口數；微台 5 口換算為 1 口小台等值。",
+    rankFormula: "中位秩百分位 = (低於本日筆數 + 同值筆數 / 2) / 樣本數 x 100。",
+    assessment,
+    metrics,
+  };
+}
+
 function average(values) {
   if (!values || values.length === 0) return null;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -1034,7 +1090,11 @@ async function loadIndex() {
 
 async function loadReport(date, updateQuery = true) {
   const report = await fetchReport(date);
-  const historyReports = await loadHistoryReports(date, 5);
+  const historyReports = await loadHistoryReports(date, 45);
+  const dashboardSections = (report.dashboard.sections ?? []).map((section) => {
+    if (section.title !== "散戶" || section.retailPosition) return section;
+    return { ...section, retailPosition: buildRetailPositionFromHistory(historyReports) };
+  });
   state.currentDate = date;
   if (updateQuery) {
     const url = new URL(window.location.href);
@@ -1048,7 +1108,7 @@ async function loadReport(date, updateQuery = true) {
   els.downloadLink.href = report.xlsxHref ?? "#";
 
   renderStrategy(report, historyReports);
-  renderSections(els.dashboardSections, report.dashboard.sections);
+  renderSections(els.dashboardSections, dashboardSections);
   renderSections(els.detailSections, report.detail.sections);
   renderStatus(state.index, state.currentDate);
   renderHistory(state.index);
