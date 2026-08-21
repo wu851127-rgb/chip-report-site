@@ -681,6 +681,180 @@ body {
   border-top: 1px solid var(--line);
 }
 
+.sc-pressure-panel {
+  margin-bottom: 14px;
+  border: 1px solid rgba(255, 176, 0, 0.38);
+  border-left: 3px solid var(--accent);
+  border-radius: 2px;
+  padding: 13px 14px;
+  background:
+    linear-gradient(90deg, rgba(255, 176, 0, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(12, 23, 37, 0.98), rgba(5, 11, 19, 0.98));
+  font-family: var(--mono);
+}
+
+.sc-pressure-panel.is-not-scored {
+  border-color: rgba(143, 163, 187, 0.28);
+  border-left-color: var(--neutral);
+  background: rgba(7, 14, 23, 0.95);
+}
+
+.sc-pressure-head,
+.sc-pressure-metric-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sc-pressure-head {
+  margin-bottom: 12px;
+}
+
+.sc-pressure-title {
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.sc-pressure-meta,
+.sc-pressure-raw,
+.sc-pressure-formula,
+.sc-pressure-note,
+.sc-pressure-inactive {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.sc-pressure-meta {
+  margin-top: 3px;
+  letter-spacing: 0.03em;
+}
+
+.sc-pressure-status,
+.sc-pressure-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  padding: 4px 7px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.sc-pressure-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sc-pressure-metric {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--neutral);
+  padding: 10px 11px;
+  background: rgba(1, 6, 12, 0.38);
+}
+
+.sc-pressure-metric-head {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.sc-pressure-metric strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--text);
+  font-size: 25px;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-pressure-raw {
+  margin-top: 7px;
+  color: #c5d1e0;
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-pressure-track {
+  position: relative;
+  overflow: hidden;
+  height: 8px;
+  margin-top: 9px;
+  border: 1px solid rgba(143, 163, 187, 0.22);
+  background:
+    linear-gradient(90deg, transparent 49.5%, rgba(255, 176, 0, 0.36) 50%, transparent 50.5%, transparent 74.5%, rgba(255, 118, 82, 0.55) 75%, transparent 75.5%, transparent 89.5%, rgba(255, 45, 85, 0.72) 90%, transparent 90.5%),
+    #07101a;
+}
+
+.sc-pressure-fill {
+  display: block;
+  height: 100%;
+  background: #7f93ad;
+}
+
+.sc-pressure-formula {
+  margin-top: 7px;
+  font-size: 9px;
+}
+
+.sc-pressure-note,
+.sc-pressure-inactive {
+  margin-top: 11px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.sc-pressure-metric.is-normal,
+.sc-pressure-status.is-normal,
+.sc-pressure-badge.is-normal {
+  border-color: rgba(88, 174, 195, 0.44);
+}
+
+.sc-pressure-metric.is-normal { border-left-color: #58aec3; }
+.sc-pressure-fill.is-normal { background: #58aec3; }
+.sc-pressure-status.is-normal,
+.sc-pressure-badge.is-normal { color: #a7e8f6; background: rgba(88, 174, 195, 0.12); }
+
+.sc-pressure-metric.is-watch,
+.sc-pressure-status.is-watch,
+.sc-pressure-badge.is-watch { border-color: rgba(255, 176, 0, 0.55); }
+.sc-pressure-metric.is-watch { border-left-color: var(--accent); }
+.sc-pressure-fill.is-watch { background: var(--accent); box-shadow: 0 0 11px rgba(255, 176, 0, 0.35); }
+.sc-pressure-status.is-watch,
+.sc-pressure-badge.is-watch { color: #ffe2a0; background: rgba(255, 176, 0, 0.14); }
+
+.sc-pressure-metric.is-pressure,
+.sc-pressure-status.is-pressure,
+.sc-pressure-badge.is-pressure { border-color: rgba(255, 118, 82, 0.62); }
+.sc-pressure-metric.is-pressure { border-left-color: #ff7652; }
+.sc-pressure-fill.is-pressure { background: #ff7652; box-shadow: 0 0 12px rgba(255, 118, 82, 0.38); }
+.sc-pressure-status.is-pressure,
+.sc-pressure-badge.is-pressure { color: #ffc4b5; background: rgba(255, 118, 82, 0.15); }
+
+.sc-pressure-metric.is-extreme,
+.sc-pressure-status.is-extreme,
+.sc-pressure-badge.is-extreme { border-color: rgba(255, 45, 85, 0.72); }
+.sc-pressure-metric.is-extreme { border-left-color: var(--risk); }
+.sc-pressure-fill.is-extreme { background: var(--risk); box-shadow: 0 0 12px rgba(255, 45, 85, 0.42); }
+.sc-pressure-status.is-extreme,
+.sc-pressure-badge.is-extreme { color: #ffb3c5; background: rgba(255, 45, 85, 0.16); }
+
+.sc-pressure-metric.is-muted,
+.sc-pressure-status.is-muted,
+.sc-pressure-badge.is-muted { border-color: var(--line-strong); color: #aebdce; }
+.sc-pressure-metric.is-muted { border-left-color: var(--neutral); }
+.sc-pressure-fill.is-muted { background: var(--neutral); }
+
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -849,6 +1023,10 @@ body {
   }
 
   .retail-position-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sc-pressure-grid {
     grid-template-columns: 1fr;
   }
 

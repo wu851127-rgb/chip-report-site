@@ -19,6 +19,7 @@ const els = {
   strategyFlag: document.querySelector("#strategyFlag"),
   strategyTone: document.querySelector("#strategyTone"),
   strategyBody: document.querySelector("#strategyBody"),
+  scPressurePanel: document.querySelector("#scPressurePanel"),
   downloadLink: document.querySelector("#downloadLink"),
   tabs: [...document.querySelectorAll(".tab")],
   views: {
@@ -201,6 +202,194 @@ function buildRetailPositionFromHistory(historyReports) {
     assessment,
     metrics,
   };
+}
+
+function scPressureTone(rank) {
+  if (rank === null) return "is-muted";
+  if (rank >= 90) return "is-extreme";
+  if (rank >= 75) return "is-pressure";
+  if (rank >= 50) return "is-watch";
+  return "is-normal";
+}
+
+function scPressureLabel(rank) {
+  if (rank === null) return "樣本不足";
+  if (rank >= 90) return "極端壓力";
+  if (rank >= 75) return "壓力突出";
+  if (rank >= 50) return "注意";
+  return "正常";
+}
+
+function percentChange(current, previous) {
+  if (current === null || previous === null || previous === 0) return null;
+  return (current - previous) / previous;
+}
+
+function formatSignedPercent(value) {
+  if (value === null || value === undefined) return "—";
+  return `${value >= 0 ? "+" : ""}${renderValue(value, "0.00%")}`;
+}
+
+function formatSignedNumber(value, digits = 0) {
+  if (value === null || value === undefined) return "—";
+  const output = Number(value).toLocaleString("zh-TW", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+  return `${value >= 0 ? "+" : ""}${output}`;
+}
+
+function buildScPressureSnapshot(historyReports) {
+  const pairs = [];
+  const maxPairs = Math.min(45, Math.max(0, historyReports.length - 1));
+  for (let index = 0; index < maxPairs; index += 1) {
+    const report = historyReports[index];
+    const previous = historyReports[index + 1];
+    const indexChange = getReportCardValue(report, "加權指數漲跌");
+    const scQty = getReportCardValue(report, "外資SC口數", { detail: true });
+    const previousScQty = getReportCardValue(previous, "外資SC口數", { detail: true });
+    const scAmount = getReportCardValue(report, "外資SC金額", { detail: true });
+    const previousScAmount = getReportCardValue(previous, "外資SC金額", { detail: true });
+    const bcAmount = getReportCardValue(report, "外資BC金額", { detail: true });
+    const previousBcAmount = getReportCardValue(previous, "外資BC金額", { detail: true });
+    const scQtyRate = percentChange(scQty, previousScQty);
+    const scAmountRate = percentChange(scAmount, previousScAmount);
+    const bcAmountRate = percentChange(bcAmount, previousBcAmount);
+    if ([indexChange, scQtyRate, scAmountRate, bcAmountRate].some((value) => value === null)) continue;
+    pairs.push({
+      date: report.date,
+      indexChange,
+      scQty,
+      previousScQty,
+      scQtyRate,
+      scAmountRate,
+      bcAmountRate,
+      strictPressure: scAmountRate - bcAmountRate,
+    });
+  }
+
+  const current = pairs[0] ?? null;
+  if (!current) return null;
+  const upDaySamples = pairs.filter((item) => item.indexChange > 0);
+  const ranked = upDaySamples.length >= 20 && current.indexChange > 0;
+  const rank = (key) => {
+    if (!ranked) return null;
+    const values = upDaySamples.map((item) => item[key]);
+    const below = values.filter((value) => value < current[key]).length;
+    const equal = values.filter((value) => value === current[key]).length;
+    return Math.round(((below + equal / 2) / values.length) * 1000) / 10;
+  };
+
+  return {
+    date: current.date,
+    isUpDay: current.indexChange > 0,
+    sampleCount: upDaySamples.length,
+    window: maxPairs,
+    speedRank: rank("scQtyRate"),
+    strictRank: rank("strictPressure"),
+    scQtyDelta: current.scQty - current.previousScQty,
+    scQtyRate: current.scQtyRate,
+    scAmountRate: current.scAmountRate,
+    bcAmountRate: current.bcAmountRate,
+    strictPressure: current.strictPressure,
+    strictCondition: current.scAmountRate > 0 && current.bcAmountRate < 0,
+  };
+}
+
+function buildScPressureMetric({ label, rank, raw, formula, tone }) {
+  const item = document.createElement("article");
+  item.className = `sc-pressure-metric ${tone}`;
+  item.title = formula;
+
+  const head = document.createElement("div");
+  head.className = "sc-pressure-metric-head";
+  const name = document.createElement("span");
+  name.textContent = label;
+  const badge = document.createElement("span");
+  badge.className = `sc-pressure-badge ${tone}`;
+  badge.textContent = scPressureLabel(rank);
+  head.append(name, badge);
+
+  const value = document.createElement("strong");
+  value.textContent = rank === null ? "未評分" : `${renderValue(rank, "0.0")}%`;
+  const rawLine = document.createElement("p");
+  rawLine.className = "sc-pressure-raw";
+  rawLine.textContent = raw;
+
+  const track = document.createElement("div");
+  track.className = "sc-pressure-track";
+  const fill = document.createElement("span");
+  fill.className = `sc-pressure-fill ${tone}`;
+  fill.style.width = `${Math.max(0, Math.min(100, rank ?? 0))}%`;
+  track.appendChild(fill);
+
+  const formulaLine = document.createElement("p");
+  formulaLine.className = "sc-pressure-formula";
+  formulaLine.textContent = formula;
+  item.append(head, value, rawLine, track, formulaLine);
+  return item;
+}
+
+function renderScPressurePanel(snapshot) {
+  const panel = els.scPressurePanel;
+  panel.replaceChildren();
+  if (!snapshot) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+  panel.className = `sc-pressure-panel ${snapshot.isUpDay ? "" : "is-not-scored"}`;
+  panel.setAttribute("aria-label", "上漲日 SC 壓力監測");
+
+  const head = document.createElement("div");
+  head.className = "sc-pressure-head";
+  const heading = document.createElement("div");
+  const title = document.createElement("div");
+  title.className = "sc-pressure-title";
+  title.textContent = "上漲日 SC 壓力監測";
+  const meta = document.createElement("p");
+  meta.className = "sc-pressure-meta";
+  meta.textContent = `透明試算｜近 ${snapshot.window} 筆交易快照中的 ${snapshot.sampleCount} 筆上漲日樣本`;
+  heading.append(title, meta);
+  const status = document.createElement("span");
+  const highestRank = Math.max(snapshot.speedRank ?? 0, snapshot.strictRank ?? 0);
+  const statusTone = snapshot.isUpDay ? scPressureTone(highestRank) : "is-muted";
+  status.className = `sc-pressure-status ${statusTone}`;
+  status.textContent = snapshot.isUpDay ? scPressureLabel(highestRank) : "下跌日未評分";
+  head.append(heading, status);
+  panel.appendChild(head);
+
+  if (!snapshot.isUpDay) {
+    const inactive = document.createElement("p");
+    inactive.className = "sc-pressure-inactive";
+    inactive.textContent = "此指標只在加權指數上漲日比較 Call 賣方壓力；下跌日請改看 Call 是否收斂、Put 留倉與散戶位階。";
+    panel.appendChild(inactive);
+  } else {
+    const grid = document.createElement("div");
+    grid.className = "sc-pressure-grid";
+    grid.append(
+      buildScPressureMetric({
+        label: "SC 增加速度",
+        rank: snapshot.speedRank,
+        raw: `SC 口數 ${formatSignedNumber(snapshot.scQtyDelta)} 口（${formatSignedPercent(snapshot.scQtyRate)}）`,
+        formula: "口數日增幅 =（今日 SC 口數 − 前日 SC 口數）÷ 前日 SC 口數；再以同條件上漲日樣本取中位排名。",
+        tone: scPressureTone(snapshot.speedRank),
+      }),
+      buildScPressureMetric({
+        label: "嚴格 SC 壓力",
+        rank: snapshot.strictRank,
+        raw: `SC ${formatSignedPercent(snapshot.scAmountRate)} ｜ BC ${formatSignedPercent(snapshot.bcAmountRate)} ｜差 ${formatSignedPercent(snapshot.strictPressure).replace("%", " 個百分點")}`,
+        formula: "壓力差 = SC 金額日增幅 − BC 金額日增幅；SC 增且 BC 降時，代表 Call 賣方壓力更嚴格。",
+        tone: scPressureTone(snapshot.strictRank),
+      })
+    );
+    panel.appendChild(grid);
+  }
+
+  const note = document.createElement("p");
+  note.className = "sc-pressure-note";
+  note.textContent = "色彩只代表 Call 賣方壓力等級，不代表大盤漲跌方向。資料來源：TAIFEX 外資 BC／SC 未平倉口數與金額；百分位為本站透明試算，非期交所官方欄位。";
+  panel.appendChild(note);
 }
 
 function average(values) {
@@ -1090,7 +1279,7 @@ async function loadIndex() {
 
 async function loadReport(date, updateQuery = true) {
   const report = await fetchReport(date);
-  const historyReports = await loadHistoryReports(date, 45);
+  const historyReports = await loadHistoryReports(date, 46);
   const dashboardSections = (report.dashboard.sections ?? []).map((section) => {
     if (section.title !== "散戶" || section.retailPosition) return section;
     return { ...section, retailPosition: buildRetailPositionFromHistory(historyReports) };
@@ -1108,6 +1297,7 @@ async function loadReport(date, updateQuery = true) {
   els.downloadLink.href = report.xlsxHref ?? "#";
 
   renderStrategy(report, historyReports);
+  renderScPressurePanel(buildScPressureSnapshot(historyReports));
   renderSections(els.dashboardSections, dashboardSections);
   renderSections(els.detailSections, report.detail.sections);
   renderStatus(state.index, state.currentDate);
