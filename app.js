@@ -652,9 +652,11 @@ function buildResearchOverlay(framework, context) {
   if (!framework) return null;
   const archetype = framework.archetypes?.[context.lensKey] ?? null;
   const tags = deriveResearchTags(context);
-  const matchedNotes = (framework.notes ?? []).filter((note) =>
-    (note.tags ?? []).some((tag) => tags.includes(tag))
-  );
+  // Notes are stored chronologically, so favor the newest matching research over stale templates.
+  const matchedNotes = (framework.notes ?? [])
+    .filter((note) => (note.tags ?? []).some((tag) => tags.includes(tag)))
+    .slice()
+    .reverse();
   const noteTitles = matchedNotes.slice(0, 2).map((note) => note.title.replace(/\s*研究筆記$/, ""));
   const noteCorePoints = compactSentences(
     matchedNotes.flatMap((note) => note.corePoints ?? []),
@@ -726,6 +728,7 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
   const foreignBcScRatio = getCardValue(allCards, "外資BC/SC增幅比例");
   const foreignBpAmount = getCardValue(allCards, "外資BP金額");
   const foreignSpAmount = getCardValue(allCards, "外資SP金額");
+  const foreignSpBpDelta = getCardValue(allCards, "外資(SP增幅-BP增幅)金額");
   const foreignBpSpRatio = getCardValue(allCards, "外資BP/SP增幅比例");
   const dealerBcSettle = getCardValue(cards, "自營(BC)OP未平倉金額與結算比");
   const dealerBpSettle = getCardValue(cards, "自營(BP)OP未平倉金額與結算比");
@@ -778,6 +781,13 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
     retailMicroNet !== null && prevRetailMicroNet !== null ? retailMicroNet - prevRetailMicroNet : null;
   const futuresCovering =
     prevForeignFut !== null && foreignFut !== null ? foreignFut - prevForeignFut : foreignFutDelta;
+  const foreignCallPressure =
+    foreignScAmount !== null && foreignBcAmount !== null ? foreignScAmount - foreignBcAmount : null;
+  const foreignPutDefense =
+    foreignBpAmount !== null && foreignSpAmount !== null ? foreignBpAmount - foreignSpAmount : null;
+  // SC-BC is the CALL pressure change; the source's SP-BP field is the inverse of PUT defence.
+  const foreignCallPressureDelta = foreignScBcDelta;
+  const foreignPutDefenseDelta = foreignSpBpDelta !== null ? -foreignSpBpDelta : null;
   const sameDirectionFuturesSignal =
     indexChange !== null &&
     foreignFutDelta !== null &&
@@ -1031,7 +1041,11 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
       ? `以高檔整理消化框架來看，現在更接近趨勢多頭裡的橫盤消化，而不是結構性翻空。歷史上類似 2020 下半年到 2021 初、以及 2021 上半年區間整理的案例，常見特徵都是價格先走時間整理，外資買權不再追價擴張、SC 留在高檔控節奏，等乖離消化後才再找下一段續攻。`
       : boxDigestSignal
         ? `以高檔箱體消化的視角來看，整理不能只看指數漲跌，而要看它是在趨勢上方做時間換空間，還是在跌勢裡被動反彈。若價格仍維持在近期均值之上、外資選擇權沒有全面轉成防禦部位，這種箱體更應先視為多頭中的節奏調整。`
-        : `以等待式布局框架來看，重點不是立刻猜方向，而是先把回測幅度、資金配置與加碼條件寫在前面，再觀察盤勢是否照劇本推進。所以 Desk View 不能只用單日強弱判斷方向，而要先把盤勢放進「主升段後整理、急跌後回箱、或高檔過熱延伸」這幾種結構，再看價格與籌碼有沒有同步驗證。`;
+      : `以等待式布局框架來看，重點不是立刻猜方向，而是先把回測幅度、資金配置與加碼條件寫在前面，再觀察盤勢是否照劇本推進。所以 Desk View 不能只用單日強弱判斷方向，而要先把盤勢放進「主升段後整理、急跌後回箱、或高檔過熱延伸」這幾種結構，再看價格與籌碼有沒有同步驗證。`;
+  const optionContourView =
+    foreignCallPressure === null || foreignPutDefense === null
+      ? "CALL / PUT 輪廓資料待補。"
+      : `外資選擇權輪廓：CALL 端淨 SC 壓力 ${renderValue(foreignCallPressure, "#,##0")}，${foreignCallPressureDelta === null ? "日增減待補" : `較前日${foreignCallPressureDelta >= 0 ? "增加" : "收斂"} ${renderValue(Math.abs(foreignCallPressureDelta), "#,##0")}`}；PUT 端防守 ${renderValue(foreignPutDefense, "#,##0")}，${foreignPutDefenseDelta === null ? "日增減待補" : `較前日${foreignPutDefenseDelta >= 0 ? "升高" : "減弱"} ${renderValue(Math.abs(foreignPutDefenseDelta), "#,##0")}`}。${indexChange !== null && foreignCallPressureDelta !== null && indexChange > 0 && foreignCallPressureDelta > 0 ? "CALL 壓力與上漲同步擴張，先視為上檔對手盤與整理監測；若後續指數鈍化卻仍續增，才是需要降級的壓力。" : foreignCallPressureDelta !== null && foreignCallPressureDelta < 0 ? "CALL 壓力收斂，有利於降低上檔壓力，但仍需確認不是單日回補。" : "存量與加減碼需同步追蹤，不能只用一側部位直接定義趨勢。"}`;
   const dealerRetailView = dealerShortOverheat
     ? `自營端賣方部位偏熱，自營(賣)OP 未平倉金額 ${renderValue(dealerSellOiAmount, "#,##0")}、BP/SP 增幅比例 ${dealerBpSpRatio !== null ? renderValue(dealerBpSpRatio, "0.00%") : "待補"}；若同時散戶多單下降，這通常支持先有反彈，但若外資 SP 與期貨回補延續不足，仍要把後續整理視為主情境。`
     : dealerHot
@@ -1051,7 +1065,7 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
   const retailView = panicWashoutSignal
     ? `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}，較前日 ${retailDelta !== null ? renderValue(retailDelta, "#,##0") : "待補"}；在大跌背景下反而減少多單，代表恐慌型部位開始鬆動，較容易形成短線相對低點。若這類盤屬於波動更大、時間更長的整理段，研究上更重視「抄底後願意先縮手」這個訊號，而不是只看散戶多單是否衝到歷史高峰。${retailMicroDelta !== null ? `微台未平倉變動 ${renderValue(retailMicroDelta, "#,##0")} 也可同步觀察情緒是否退潮。` : ""} ${retailPositionView}`
     : retailChasingLong
-      ? `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}、微台未平倉 ${retailMicroNet !== null ? renderValue(retailMicroNet, "#,##0") : "待補"}，微台多空比 ${retailMicroRatio !== null ? renderValue(retailMicroRatio, "0.00%") : "待補"}；情緒面已有追多痕跡，依歷史經驗較常出現在行情末段或回測前夕。${retailPositionView}`
+      ? `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}、微台未平倉 ${retailMicroNet !== null ? renderValue(retailMicroNet, "#,##0") : "待補"}，微台多空比 ${retailMicroRatio !== null ? `${renderValue(Number(retailMicroRatio.toFixed(2)))}%` : "待補"}；情緒面已有追多痕跡，依歷史經驗較常出現在行情末段或回測前夕。${retailPositionView}`
       : `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}、微台未平倉 ${retailMicroNet !== null ? renderValue(retailMicroNet, "#,##0") : "待補"}；目前還沒看到全面追價失控，這讓行情若要延續，結構上仍比較健康。${retailPositionView}`;
   const overheatView = optionOverheatSignal
     ? `若再把外資與自營買權槓桿一起看，現在已接近文章所說的「雙紫爆」輪廓；這通常不是單純看多確認，而是提醒短線漲勢可能已進入驚驚漲末段，後續較容易轉為 5% 上下甚至更大的回測整理。`
@@ -1119,18 +1133,18 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
 
   const evidenceView = buildDeskViewBody(
     lensKey === "divergence"
-      ? [tapeView, optionsView, futuresView, contrarianPhrase || expertLongPhrase]
+      ? [tapeView, optionsView, optionContourView, futuresView, contrarianPhrase || expertLongPhrase]
       : lensKey === "bottoming"
-        ? [retailView, futuresView, optionsView]
+        ? [retailView, futuresView, optionsView, optionContourView]
         : lensKey === "washout"
           ? [tapeView, retailView, dealerRetailView]
           : lensKey === "repair"
-            ? [historyContextView, futuresView, optionsView]
+            ? [historyContextView, futuresView, optionsView, optionContourView]
             : lensKey === "accumulation"
-              ? [historyContextView, optionsView, retailView]
-            : lensKey === "overheat"
-              ? [optionsView, overheatView, retailView, dealerRetailView]
-                  : [tapeView, futuresView, dealerRetailView, optionsView]
+              ? [historyContextView, optionsView, optionContourView, retailView]
+              : lensKey === "overheat"
+                ? [optionsView, optionContourView, overheatView, retailView, dealerRetailView]
+                  : [tapeView, futuresView, dealerRetailView, optionsView, optionContourView]
   );
 
   const riskView =
