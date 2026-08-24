@@ -20,6 +20,7 @@ const els = {
   strategyTone: document.querySelector("#strategyTone"),
   strategyBody: document.querySelector("#strategyBody"),
   scPressurePanel: document.querySelector("#scPressurePanel"),
+  optionContourPanel: document.querySelector("#optionContourPanel"),
   downloadLink: document.querySelector("#downloadLink"),
   tabs: [...document.querySelectorAll(".tab")],
   views: {
@@ -390,6 +391,151 @@ function renderScPressurePanel(snapshot) {
   note.className = "sc-pressure-note";
   note.textContent = "色彩只代表 Call 賣方壓力等級，不代表大盤漲跌方向。資料來源：TAIFEX 外資 BC／SC 未平倉口數與金額；百分位為本站透明試算，非期交所官方欄位。";
   panel.appendChild(note);
+}
+
+function midrankFromValues(values, current) {
+  if (values.length < 20 || current === null) return null;
+  const below = values.filter((value) => value < current).length;
+  const equal = values.filter((value) => value === current).length;
+  return Math.round(((below + equal / 2) / values.length) * 1000) / 10;
+}
+
+function buildOptionContourSnapshot(historyReports) {
+  const samples = historyReports.slice(0, 45).map((report) => {
+    const bc = getReportCardValue(report, "外資BC金額", { detail: true });
+    const sc = getReportCardValue(report, "外資SC金額", { detail: true });
+    const bp = getReportCardValue(report, "外資BP金額", { detail: true });
+    const sp = getReportCardValue(report, "外資SP金額", { detail: true });
+    if ([bc, sc, bp, sp].some((value) => value === null)) return null;
+    return { callPressure: sc - bc, putDefense: bp - sp };
+  }).filter(Boolean);
+  const current = samples[0] ?? null;
+  const previous = samples[1] ?? null;
+  if (!current || !previous) return null;
+
+  return {
+    sampleCount: samples.length,
+    window: 45,
+    callPressure: current.callPressure,
+    callChange: current.callPressure - previous.callPressure,
+    callRank: midrankFromValues(samples.map((item) => item.callPressure), current.callPressure),
+    putDefense: current.putDefense,
+    putChange: current.putDefense - previous.putDefense,
+    putRank: midrankFromValues(samples.map((item) => item.putDefense), current.putDefense),
+  };
+}
+
+function changeLabel(change, side) {
+  if (change === 0) return side === "call" ? "壓力持平" : "防守持平";
+  if (side === "call") return change > 0 ? "壓力升高" : "壓力收斂";
+  return change > 0 ? "防守升高" : "防守減弱";
+}
+
+function changeTone(change, side) {
+  if (change === 0) return "is-flat";
+  if (side === "call") return change > 0 ? "is-call-rising" : "is-call-easing";
+  return change > 0 ? "is-put-rising" : "is-put-easing";
+}
+
+function buildOptionContourMetric({ side, value, change, rank, formula }) {
+  const isCall = side === "call";
+  const item = document.createElement("article");
+  item.className = `option-contour-metric ${isCall ? "is-call" : "is-put"}`;
+  item.title = formula;
+
+  const head = document.createElement("div");
+  head.className = "option-contour-metric-head";
+  const label = document.createElement("span");
+  label.textContent = isCall ? "CALL 端｜上檔壓力" : "PUT 端｜下檔防守";
+  const rankTag = document.createElement("span");
+  rankTag.className = "option-contour-rank";
+  rankTag.textContent = rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}% 位階`;
+  head.append(label, rankTag);
+
+  const total = document.createElement("strong");
+  total.className = "option-contour-total";
+  total.textContent = renderValue(value, "#,##0");
+  const unit = document.createElement("span");
+  unit.className = "option-contour-unit";
+  unit.textContent = "未平倉淨額｜仟元";
+
+  const delta = document.createElement("div");
+  const deltaTone = changeTone(change, side);
+  delta.className = `option-contour-delta ${deltaTone}`;
+  const arrow = document.createElement("span");
+  arrow.textContent = change > 0 ? "▲" : change < 0 ? "▼" : "■";
+  const deltaText = document.createElement("span");
+  deltaText.textContent = `${formatSignedNumber(change)}｜${changeLabel(change, side)}`;
+  delta.append(arrow, deltaText);
+
+  const track = document.createElement("div");
+  track.className = "option-contour-track";
+  const fill = document.createElement("span");
+  fill.className = "option-contour-fill";
+  fill.style.width = `${Math.max(0, Math.min(100, rank ?? 0))}%`;
+  track.appendChild(fill);
+
+  const formulaLine = document.createElement("p");
+  formulaLine.className = "option-contour-formula";
+  formulaLine.textContent = formula;
+  item.append(head, total, unit, delta, track, formulaLine);
+  return item;
+}
+
+function renderOptionContourPanel(snapshot) {
+  const panel = els.optionContourPanel;
+  panel.replaceChildren();
+  if (!snapshot) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+
+  const head = document.createElement("div");
+  head.className = "option-contour-head";
+  const heading = document.createElement("div");
+  const title = document.createElement("div");
+  title.className = "option-contour-title";
+  title.textContent = "外資選擇權輪廓｜存量 × 加減碼";
+  const meta = document.createElement("p");
+  meta.className = "option-contour-meta";
+  meta.textContent = `近 ${snapshot.window} 筆交易快照 / ${snapshot.sampleCount} 筆樣本 / TAIFEX 外資未平倉金額`;
+  heading.append(title, meta);
+  const conclusion = document.createElement("span");
+  conclusion.className = "option-contour-conclusion";
+  conclusion.textContent = `${changeLabel(snapshot.callChange, "call")}｜${changeLabel(snapshot.putChange, "put")}`;
+  head.append(heading, conclusion);
+  panel.appendChild(head);
+
+  const grid = document.createElement("div");
+  grid.className = "option-contour-grid";
+  grid.append(
+    buildOptionContourMetric({
+      side: "call",
+      value: snapshot.callPressure,
+      change: snapshot.callChange,
+      rank: snapshot.callRank,
+      formula: "CALL 端壓力 = SC 金額 − BC 金額；今日增減 = 今日壓力 − 前日壓力。",
+    }),
+    buildOptionContourMetric({
+      side: "put",
+      value: snapshot.putDefense,
+      change: snapshot.putChange,
+      rank: snapshot.putRank,
+      formula: "PUT 端防守 = BP 金額 − SP 金額；今日增減 = 今日防守 − 前日防守。",
+    })
+  );
+  panel.appendChild(grid);
+
+  const interpretation = document.createElement("p");
+  interpretation.className = "option-contour-interpretation";
+  interpretation.textContent = `本日輪廓：CALL 端較前日${snapshot.callChange > 0 ? "增加" : snapshot.callChange < 0 ? "減少" : "持平"} ${renderValue(Math.abs(snapshot.callChange), "#,##0")}；PUT 端較前日${snapshot.putChange > 0 ? "增加" : snapshot.putChange < 0 ? "減少" : "持平"} ${renderValue(Math.abs(snapshot.putChange), "#,##0")}。存量與增減必須一起看，不可單憑其中一側直接判定多空。`;
+  panel.appendChild(interpretation);
+
+  const legend = document.createElement("p");
+  legend.className = "option-contour-legend";
+  legend.textContent = "色碼：橘紅＝CALL 上檔壓力；藍紫＝PUT 下檔防守；青綠＝CALL 壓力收斂；灰＝持平或防守減弱。";
+  panel.appendChild(legend);
 }
 
 function average(values) {
@@ -1298,6 +1444,7 @@ async function loadReport(date, updateQuery = true) {
 
   renderStrategy(report, historyReports);
   renderScPressurePanel(buildScPressureSnapshot(historyReports));
+  renderOptionContourPanel(buildOptionContourSnapshot(historyReports));
   renderSections(els.dashboardSections, dashboardSections);
   renderSections(els.detailSections, report.detail.sections);
   renderStatus(state.index, state.currentDate);

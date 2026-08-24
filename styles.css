@@ -855,6 +855,148 @@ body {
 .sc-pressure-metric.is-muted { border-left-color: var(--neutral); }
 .sc-pressure-fill.is-muted { background: var(--neutral); }
 
+.option-contour-panel {
+  margin-bottom: 14px;
+  border: 1px solid rgba(123, 144, 174, 0.34);
+  border-left: 3px solid #d4a64d;
+  border-radius: 2px;
+  padding: 13px 14px;
+  background:
+    linear-gradient(90deg, rgba(255, 118, 82, 0.055), transparent 28%, transparent 70%, rgba(111, 122, 255, 0.065)),
+    linear-gradient(180deg, rgba(12, 23, 37, 0.98), rgba(5, 11, 19, 0.98));
+  font-family: var(--mono);
+}
+
+.option-contour-head,
+.option-contour-metric-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.option-contour-head { margin-bottom: 12px; }
+
+.option-contour-title {
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.option-contour-meta,
+.option-contour-unit,
+.option-contour-formula,
+.option-contour-interpretation,
+.option-contour-legend {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.option-contour-meta { margin-top: 3px; }
+
+.option-contour-conclusion {
+  border: 1px solid rgba(255, 176, 0, 0.38);
+  border-radius: 2px;
+  padding: 4px 7px;
+  color: #ffe2a0;
+  background: rgba(255, 176, 0, 0.1);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.option-contour-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.option-contour-metric {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--neutral);
+  padding: 10px 11px;
+  background: rgba(1, 6, 12, 0.38);
+}
+
+.option-contour-metric.is-call { border-left-color: #ff7652; }
+.option-contour-metric.is-put { border-left-color: #7d8cff; }
+
+.option-contour-metric-head {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.option-contour-rank {
+  border: 1px solid rgba(143, 163, 187, 0.26);
+  border-radius: 2px;
+  padding: 3px 5px;
+  color: #bdcad9;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.option-contour-total {
+  display: block;
+  margin-top: 8px;
+  font-size: 25px;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-call .option-contour-total { color: #ffb39f; }
+.is-put .option-contour-total { color: #b4c0ff; }
+
+.option-contour-unit { display: block; margin-top: 4px; font-size: 9px; }
+
+.option-contour-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 9px;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.option-contour-delta.is-call-rising { color: #ff8aa3; }
+.option-contour-delta.is-call-easing { color: #70dcc2; }
+.option-contour-delta.is-put-rising { color: #90a3ff; }
+.option-contour-delta.is-put-easing,
+.option-contour-delta.is-flat { color: #aebdce; }
+
+.option-contour-track {
+  overflow: hidden;
+  height: 7px;
+  margin-top: 8px;
+  border: 1px solid rgba(143, 163, 187, 0.22);
+  background:
+    linear-gradient(90deg, transparent 49.5%, rgba(143, 163, 187, 0.32) 50%, transparent 50.5%, transparent 79.5%, rgba(255, 176, 0, 0.52) 80%, transparent 80.5%),
+    #07101a;
+}
+
+.option-contour-fill { display: block; height: 100%; }
+.is-call .option-contour-fill { background: linear-gradient(90deg, #ffb000, #ff7652); box-shadow: 0 0 11px rgba(255, 118, 82, 0.35); }
+.is-put .option-contour-fill { background: linear-gradient(90deg, #58aec3, #7d8cff); box-shadow: 0 0 11px rgba(125, 140, 255, 0.3); }
+
+.option-contour-formula { margin-top: 7px; font-size: 9px; }
+
+.option-contour-interpretation,
+.option-contour-legend {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.option-contour-legend { margin-top: 6px; padding-top: 0; border-top: 0; color: #aebdce; }
+
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -1028,6 +1170,14 @@ body {
 
   .sc-pressure-grid {
     grid-template-columns: 1fr;
+  }
+
+  .option-contour-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .option-contour-head {
+    flex-wrap: wrap;
   }
 
   .retail-position-head {
