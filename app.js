@@ -652,11 +652,16 @@ function buildResearchOverlay(framework, context) {
   if (!framework) return null;
   const archetype = framework.archetypes?.[context.lensKey] ?? null;
   const tags = deriveResearchTags(context);
-  // Notes are stored chronologically, so favor the newest matching research over stale templates.
+  // Prefer curated notes over automatic drafts, then favor the newest matching research.
   const matchedNotes = (framework.notes ?? [])
     .filter((note) => (note.tags ?? []).some((tag) => tags.includes(tag)))
     .slice()
-    .reverse();
+    .sort((left, right) => {
+      const leftAuto = /自動初稿|_auto-note/i.test(`${left.title ?? ""} ${left.source ?? ""}`);
+      const rightAuto = /自動初稿|_auto-note/i.test(`${right.title ?? ""} ${right.source ?? ""}`);
+      if (leftAuto !== rightAuto) return leftAuto ? 1 : -1;
+      return String(right.source ?? "").localeCompare(String(left.source ?? ""), "zh-Hant");
+    });
   const noteTitles = matchedNotes.slice(0, 2).map((note) => note.title.replace(/\s*研究筆記$/, ""));
   const noteCorePoints = compactSentences(
     matchedNotes.flatMap((note) => note.corePoints ?? []),
