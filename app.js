@@ -945,6 +945,11 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
     toneLabel = "槓桿警示";
   }
 
+  // A consolidation signal keeps a weak day from being labeled as a confirmed trend reversal.
+  if (lateStageConsolidationSignal && tone === "bear") {
+    toneLabel = "整理偏空";
+  }
+
   let lensKey = "balanced";
   let lensLabel = "平衡確認型";
   if (contrarianBullSignal) {
