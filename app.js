@@ -738,6 +738,8 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
   const dealerBcSettle = getCardValue(cards, "自營(BC)OP未平倉金額與結算比");
   const dealerBpSettle = getCardValue(cards, "自營(BP)OP未平倉金額與結算比");
   const dealerBuyOiAmount = getCardValue(cards, "自營(買)OP未平倉金額");
+  const scPressureSnapshot = buildScPressureSnapshot(recentReports);
+  const optionContourSnapshot = buildOptionContourSnapshot(recentReports);
   const dealerSellOiAmount = getCardValue(cards, "自營(賣)OP未平倉金額");
   const dealerScBcDelta = getCardValue(allCards, "自營(SC增幅-BC增幅)金額");
   const dealerBpSpRatio = getCardValue(allCards, "自營BP/SP增幅比例");
@@ -1051,6 +1053,12 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
     foreignCallPressure === null || foreignPutDefense === null
       ? "CALL / PUT 輪廓資料待補。"
       : `外資選擇權輪廓：CALL 端淨 SC 壓力 ${renderValue(foreignCallPressure, "#,##0")}，${foreignCallPressureDelta === null ? "日增減待補" : `較前日${foreignCallPressureDelta >= 0 ? "增加" : "收斂"} ${renderValue(Math.abs(foreignCallPressureDelta), "#,##0")}`}；PUT 端防守 ${renderValue(foreignPutDefense, "#,##0")}，${foreignPutDefenseDelta === null ? "日增減待補" : `較前日${foreignPutDefenseDelta >= 0 ? "升高" : "減弱"} ${renderValue(Math.abs(foreignPutDefenseDelta), "#,##0")}`}。${indexChange !== null && foreignCallPressureDelta !== null && indexChange > 0 && foreignCallPressureDelta > 0 ? "CALL 壓力與上漲同步擴張，先視為上檔對手盤與整理監測；若後續指數鈍化卻仍續增，才是需要降級的壓力。" : foreignCallPressureDelta !== null && foreignCallPressureDelta < 0 ? "CALL 壓力收斂，有利於降低上檔壓力，但仍需確認不是單日回補。" : "存量與加減碼需同步追蹤，不能只用一側部位直接定義趨勢。"}`;
+  const scQualityView =
+    !scPressureSnapshot
+      ? "SC 壓力品質的歷史比較樣本不足，暫不以速度判斷。"
+      : !scPressureSnapshot.isUpDay
+        ? `今日為下跌日，依研究規則不將 SC 速度或嚴格 SC 壓力硬套進上漲日百分位；SC 金額 ${formatSignedPercent(scPressureSnapshot.scAmountRate)}、BC 金額 ${formatSignedPercent(scPressureSnapshot.bcAmountRate)}，應改以 CALL 壓力是否收斂與 PUT 防守是否升級判讀。`
+        : `今日為上漲日，SC 口數日增 ${formatSignedPercent(scPressureSnapshot.scQtyRate)}，速度位階 ${scPressureSnapshot.speedRank === null ? "樣本不足" : `${renderValue(scPressureSnapshot.speedRank, "0.0")}%`}；嚴格 SC 壓力位階 ${scPressureSnapshot.strictRank === null ? "樣本不足" : `${renderValue(scPressureSnapshot.strictRank, "0.0")}%`}。${optionContourSnapshot?.callRank !== null && optionContourSnapshot?.callRank !== undefined ? `CALL 壓力存量位階 ${renderValue(optionContourSnapshot.callRank, "0.0")}%` : "CALL 壓力存量位階樣本不足"}；只有速度與壓力同時逼近極端、且 BC 由低檔加速時，才提高過熱降檔權重。`;
   const dealerRetailView = dealerShortOverheat
     ? `自營端賣方部位偏熱，自營(賣)OP 未平倉金額 ${renderValue(dealerSellOiAmount, "#,##0")}、BP/SP 增幅比例 ${dealerBpSpRatio !== null ? renderValue(dealerBpSpRatio, "0.00%") : "待補"}；若同時散戶多單下降，這通常支持先有反彈，但若外資 SP 與期貨回補延續不足，仍要把後續整理視為主情境。`
     : dealerHot
@@ -1146,7 +1154,7 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
           : lensKey === "repair"
             ? [historyContextView, futuresView, optionsView, optionContourView]
             : lensKey === "accumulation"
-              ? [historyContextView, optionsView, optionContourView, retailView]
+              ? [historyContextView, optionsView, optionContourView, scQualityView, retailView]
               : lensKey === "overheat"
                 ? [optionsView, optionContourView, overheatView, retailView, dealerRetailView]
                   : [tapeView, futuresView, dealerRetailView, optionsView, optionContourView]
