@@ -780,6 +780,7 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
   const cards = collectCards(report);
   const allCards = collectAllCards(report);
   const prevCards = prevReport ? collectCards(prevReport) : [];
+  const prevAllCards = prevReport ? collectAllCards(prevReport) : [];
   const indexChange = getCardValue(cards, "加權指數漲跌");
   const indexLevel = getCardValue(cards, "加權指數");
   const pcr = getCardValue(cards, "PCR與結算比");
@@ -801,6 +802,8 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
   const foreignBcScRatio = getCardValue(allCards, "外資BC/SC增幅比例");
   const foreignBpAmount = getCardValue(allCards, "外資BP金額");
   const foreignSpAmount = getCardValue(allCards, "外資SP金額");
+  const foreignBpLots = getCardValue(allCards, "外資BP口數");
+  const foreignSpLots = getCardValue(allCards, "外資SP口數");
   const foreignSpBpDelta = getCardValue(allCards, "外資(SP增幅-BP增幅)金額");
   const foreignBpSpRatio = getCardValue(allCards, "外資BP/SP增幅比例");
   const dealerBcSettle = getCardValue(cards, "自營(BC)OP未平倉金額與結算比");
@@ -821,6 +824,8 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
   const prevRetailNet = getCardValue(prevCards, "散戶未平倉");
   const prevRetailMicroNet = getCardValue(prevCards, "微台散戶未平倉");
   const prevForeignFut = getCardValue(prevCards, "外資(大小台)期貨未平倉");
+  const prevForeignBpLots = getCardValue(prevAllCards, "外資BP口數");
+  const prevForeignSpLots = getCardValue(prevAllCards, "外資SP口數");
   const isSettlementResetDay = bcSettle === 0;
   const largeBcPosition =
     (bcSettle !== null && bcSettle >= 1_000_000) ||
@@ -843,9 +848,18 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
   const putDefenseSignal =
     (bpSettle !== null && bpSettle > 0) ||
     (foreignSellOiAmount !== null && foreignSellOiAmount > foreignBuyOiAmount);
+  const foreignBpLotDelta =
+    foreignBpLots !== null && prevForeignBpLots !== null ? foreignBpLots - prevForeignBpLots : null;
+  const foreignSpLotDelta =
+    foreignSpLots !== null && prevForeignSpLots !== null ? foreignSpLots - prevForeignSpLots : null;
+  // SP is a down-day flow signal: both PUT sides add, but new SP lots exceed new BP lots.
   const foreignSpSignal =
-    (foreignSpAmount !== null && foreignBpAmount !== null && foreignSpAmount > foreignBpAmount) ||
-    (foreignSellOiAmount !== null && foreignSellOiAmount < 0);
+    indexChange !== null &&
+    indexChange < 0 &&
+    foreignBpLotDelta !== null &&
+    foreignSpLotDelta !== null &&
+    foreignBpLotDelta > 0 &&
+    foreignSpLotDelta > foreignBpLotDelta;
   const dealerShortOverheat =
     (dealerSellOiAmount !== null && dealerSellOiAmount < 0) ||
     (dealerBpSettle !== null && dealerBpSettle > 500000) ||
@@ -1107,7 +1121,7 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
     : largeBcPosition
     ? `外資選擇權核心仍在買權槓桿。${isSettlementResetDay ? `結算日使 BC 結算比歸零，但 BC 原始金額仍有 ${renderValue(foreignBcAmount, "#,##0")}，代表部位只是重置、不是退場。` : `BC 結算比 ${getCardRender(cards, "外資(BC)OP未平倉金額與結算比")}，原始 BC 金額 ${renderValue(foreignBcAmount, "#,##0")}；搭配買方比 ${getCardRender(cards, "外資買方買權/賣權比")} 與淨買權/賣權比 ${getCardRender(cards, "外資買權/賣權比")}，外資仍把槓桿押在上檔。`} ${foreignScBcDelta !== null && foreignScBcDelta < 0 ? `SC 減碼差 ${renderValue(foreignScBcDelta, "#,##0")} 顯示賣方買權同步縮手。` : ""} ${foreignBcScRatio !== null ? `BC/SC 增幅比例 ${renderValue(foreignBcScRatio, "0.00%")} 可視為買權主導度的延伸指標。` : ""}`
     : foreignSpSignal
-      ? `外資買權槓桿沒有再明顯升溫，但外資賣方部位已開始偏向 SP 訊號，代表保護性部位的性質正在轉變；若與散戶多單下降同步出現，通常比單看指數跌深更有參考價值。`
+      ? `外資 PUT 端在下跌日出現 SP 承接：BP 新增 ${formatSignedNumber(foreignBpLotDelta)} 口、SP 新增 ${formatSignedNumber(foreignSpLotDelta)} 口，且 SP 增量較大。這代表保護性部位開始轉為承接；若再與散戶多單下降、外資期貨逆勢回補同步，才提高相對低點權重。`
     : putDefenseSignal
       ? `外資買權槓桿沒有再明顯升溫，反而要留意賣權端的防禦配置。BP/SP 金額與增幅顯示保護性部位仍在，較像上方空間保留、下方風險同時控管的結構。`
       : `外資選擇權沒有單邊失衡，買方比 ${getCardRender(cards, "外資買方買權/賣權比")}、淨買權/賣權比 ${getCardRender(cards, "外資買權/賣權比")}，目前偏向保留彈性，而不是直接押單邊行情。`;
