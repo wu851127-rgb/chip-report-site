@@ -164,6 +164,7 @@ function buildRetailPositionFromHistory(historyReports) {
   const equivalentLong = (values) => values["散戶看多"] + values["微台散戶看多"] / 5;
   const equivalentShort = (values) => values["散戶看空"] + values["微台散戶看空"] / 5;
   const equivalentNet = (values) => equivalentLong(values) - equivalentShort(values);
+  const rawLong = (values) => values["散戶看多"] + values["微台散戶看多"];
   const metricDefinitions = [
     ["equivalentLong", "散戶多方位階", equivalentLong, "小台散戶看多 + 微台散戶看多 / 5", "多方擁擠"],
     ["equivalentShort", "散戶空方位階", equivalentShort, "小台散戶看空 + 微台散戶看空 / 5", "空方擁擠"],
@@ -185,6 +186,53 @@ function buildRetailPositionFromHistory(historyReports) {
       crowding,
     };
   });
+  const speedSamples = samples
+    .slice(0, -1)
+    .map((values, index) => {
+      const previous = samples[index + 1];
+      const currentEquivalent = equivalentLong(values);
+      const previousEquivalent = equivalentLong(previous);
+      const currentRaw = rawLong(values);
+      const previousRaw = rawLong(previous);
+      if (previousEquivalent === 0 || previousRaw === 0) return null;
+      return {
+        equivalentRate: (currentEquivalent - previousEquivalent) / previousEquivalent,
+        equivalentDelta: currentEquivalent - previousEquivalent,
+        rawRate: (currentRaw - previousRaw) / previousRaw,
+        rawDelta: currentRaw - previousRaw,
+      };
+    })
+    .filter(Boolean);
+  const currentSpeed = speedSamples[0] ?? null;
+  const canRankSpeed = speedSamples.length >= 20;
+  const speedStrength = currentSpeed ? Math.abs(currentSpeed.equivalentRate) : null;
+  const speedStrengthRank = canRankSpeed && speedStrength !== null
+    ? Math.round(
+      ((
+        speedSamples.filter((sample) => Math.abs(sample.equivalentRate) < speedStrength).length +
+        speedSamples.filter((sample) => Math.abs(sample.equivalentRate) === speedStrength).length / 2
+      ) / speedSamples.length) * 1000
+    ) / 10
+    : null;
+  if (currentSpeed) {
+    const tone = currentSpeed.equivalentRate >= 0 ? "positive" : "negative";
+    const speedLabel = currentSpeed.equivalentRate >= 0
+      ? speedStrengthRank !== null && speedStrengthRank >= 80 ? "追多加速" : "多單增加"
+      : speedStrengthRank !== null && speedStrengthRank >= 80 ? "去槓桿加速" : "多單降溫";
+    metrics.push({
+      key: "equivalentLongVelocity",
+      label: "等值多單增減速度",
+      value: speedStrengthRank,
+      current: currentSpeed.equivalentRate,
+      currentDelta: currentSpeed.equivalentDelta,
+      rawRate: currentSpeed.rawRate,
+      rawDelta: currentSpeed.rawDelta,
+      formula: "等值多單 = 小台散戶看多 + 微台散戶看多 / 5；速度強度位階以近45日等值多單日變動率絕對值取中間排名。",
+      crowding: speedLabel,
+      type: "velocity",
+      tone,
+    });
+  }
   const longRank = metrics[0].value;
   const shortRank = metrics[1].value;
   const assessment = longRank !== null && shortRank !== null && longRank >= 80 && shortRank >= 80
@@ -1313,7 +1361,7 @@ function buildRetailPositionPanel(position) {
   title.textContent = "散戶位階圖";
   const meta = document.createElement("div");
   meta.className = "retail-position-meta";
-  meta.textContent = `${position.window ?? 45} 日樣本 / ${position.sampleCount ?? 0} 筆 / 小台＋微台等值口數`;
+  meta.textContent = `${position.window ?? 45} 日樣本 / ${position.sampleCount ?? 0} 筆 / 等值口數＋速度`;
   head.append(title, meta);
 
   const assessment = document.createElement("div");
@@ -1327,14 +1375,18 @@ function buildRetailPositionPanel(position) {
   grid.className = "retail-position-grid";
   for (const metric of position.metrics) {
     const item = document.createElement("article");
-    item.className = `retail-meter retail-meter-${metric.key ?? "neutral"}`;
+    item.className = `retail-meter retail-meter-${metric.key ?? "neutral"}${metric.type === "velocity" ? ` is-velocity is-velocity-${metric.tone}` : ""}`;
     const metricHead = document.createElement("div");
     metricHead.className = "retail-meter-head";
     const label = document.createElement("span");
     label.textContent = metric.label ?? "位階";
     const rank = numericValue(metric.value);
     const value = document.createElement("strong");
-    value.textContent = rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}%`;
+    const isVelocity = metric.type === "velocity";
+    const speed = numericValue(metric.current);
+    value.textContent = isVelocity
+      ? speed === null ? "樣本不足" : formatSignedPercent(speed)
+      : rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}%`;
     metricHead.append(label, value);
     item.appendChild(metricHead);
 
@@ -1351,7 +1403,15 @@ function buildRetailPositionPanel(position) {
     const currentText = metric.key === "microRatio"
       ? `${current === null ? "—" : renderValue(current, "0.00") + "%"}`
       : `${current === null ? "—" : renderValue(current, "#,##0.0")} 口`;
-    caption.textContent = `現值 ${currentText} / ${metric.formula ?? ""}`;
+    caption.textContent = isVelocity
+      ? `${metric.crowding}｜速度強度 ${rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}%`}｜等值變動 ${formatSignedNumber(numericValue(metric.currentDelta), 1)} 口｜原始口數對照 ${formatSignedPercent(numericValue(metric.rawRate))}（${formatSignedNumber(numericValue(metric.rawDelta))} 口）`
+      : `現值 ${currentText} / ${metric.formula ?? ""}`;
+    if (isVelocity) {
+      const formula = document.createElement("p");
+      formula.className = "retail-meter-formula";
+      formula.textContent = metric.formula ?? "";
+      item.appendChild(formula);
+    }
     item.appendChild(caption);
     grid.appendChild(item);
   }
@@ -1359,7 +1419,7 @@ function buildRetailPositionPanel(position) {
 
   const note = document.createElement("p");
   note.className = "retail-position-note";
-  note.textContent = `近45日相對位階（同值取中間排名）= (低於本日筆數 + 同值筆數 / 2) / 樣本數 x 100。高位階代表部位較擁擠，僅作為風險與情緒觀察，不能單獨當成買賣訊號。`;
+  note.textContent = `存量位階以近45日相對位階（同值取中間排名）計算；速度卡以等值多單的日變動率絕對值衡量加速強度。紅色表示多單增加、綠色表示多單下降，顏色不是方向建議。`;
   panel.appendChild(note);
   return panel;
 }

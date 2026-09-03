@@ -667,6 +667,45 @@ body {
   box-shadow: 0 0 10px rgba(47, 207, 122, 0.3);
 }
 
+.retail-meter-velocity {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.retail-meter-velocity .retail-meter-head {
+  margin-bottom: 6px;
+}
+
+.retail-meter-velocity .retail-meter-head strong {
+  font-size: 18px;
+}
+
+.retail-meter.is-velocity-positive .retail-meter-head strong {
+  color: #ff756d;
+}
+
+.retail-meter.is-velocity-negative .retail-meter-head strong {
+  color: #54d899;
+}
+
+.retail-meter.is-velocity-positive .retail-meter-fill {
+  background: linear-gradient(90deg, #ff9b71, #ff4055);
+  box-shadow: 0 0 12px rgba(255, 64, 85, 0.45);
+}
+
+.retail-meter.is-velocity-negative .retail-meter-fill {
+  background: linear-gradient(90deg, #8af0c2, #22b879);
+  box-shadow: 0 0 12px rgba(34, 184, 121, 0.42);
+}
+
+.retail-meter-formula {
+  margin-top: 4px;
+  color: #8094a9;
+  font-size: 8px;
+  line-height: 1.4;
+}
+
 .retail-meter p,
 .retail-position-note {
   margin: 5px 0 0;
