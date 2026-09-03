@@ -165,6 +165,7 @@ function buildRetailPositionFromHistory(historyReports) {
   const equivalentShort = (values) => values["散戶看空"] + values["微台散戶看空"] / 5;
   const equivalentNet = (values) => equivalentLong(values) - equivalentShort(values);
   const rawLong = (values) => values["散戶看多"] + values["微台散戶看多"];
+  const rawShort = (values) => values["散戶看空"] + values["微台散戶看空"];
   const metricDefinitions = [
     ["equivalentLong", "散戶多方位階", equivalentLong, "小台散戶看多 + 微台散戶看多 / 5", "多方擁擠"],
     ["equivalentShort", "散戶空方位階", equivalentShort, "小台散戶看空 + 微台散戶看空 / 5", "空方擁擠"],
@@ -186,53 +187,72 @@ function buildRetailPositionFromHistory(historyReports) {
       crowding,
     };
   });
-  const speedSamples = samples
-    .slice(0, -1)
-    .map((values, index) => {
-      const previous = samples[index + 1];
-      const currentEquivalent = equivalentLong(values);
-      const previousEquivalent = equivalentLong(previous);
-      const currentRaw = rawLong(values);
-      const previousRaw = rawLong(previous);
-      if (previousEquivalent === 0 || previousRaw === 0) return null;
-      return {
-        equivalentRate: (currentEquivalent - previousEquivalent) / previousEquivalent,
-        equivalentDelta: currentEquivalent - previousEquivalent,
-        rawRate: (currentRaw - previousRaw) / previousRaw,
-        rawDelta: currentRaw - previousRaw,
-      };
-    })
-    .filter(Boolean);
-  const currentSpeed = speedSamples[0] ?? null;
-  const canRankSpeed = speedSamples.length >= 20;
-  const speedStrength = currentSpeed ? Math.abs(currentSpeed.equivalentRate) : null;
-  const speedStrengthRank = canRankSpeed && speedStrength !== null
-    ? Math.round(
-      ((
-        speedSamples.filter((sample) => Math.abs(sample.equivalentRate) < speedStrength).length +
-        speedSamples.filter((sample) => Math.abs(sample.equivalentRate) === speedStrength).length / 2
-      ) / speedSamples.length) * 1000
-    ) / 10
-    : null;
-  if (currentSpeed) {
-    const tone = currentSpeed.equivalentRate >= 0 ? "positive" : "negative";
-    const speedLabel = currentSpeed.equivalentRate >= 0
-      ? speedStrengthRank !== null && speedStrengthRank >= 80 ? "追多加速" : "多單增加"
-      : speedStrengthRank !== null && speedStrengthRank >= 80 ? "去槓桿加速" : "多單降溫";
-    metrics.push({
-      key: "equivalentLongVelocity",
-      label: "等值多單增減速度",
+  const buildVelocityMetric = ({ key, label, equivalent, raw, formula, increased, decreased }) => {
+    const speedSamples = samples
+      .slice(0, -1)
+      .map((values, index) => {
+        const previous = samples[index + 1];
+        const currentEquivalent = equivalent(values);
+        const previousEquivalent = equivalent(previous);
+        const currentRaw = raw(values);
+        const previousRaw = raw(previous);
+        if (previousEquivalent === 0 || previousRaw === 0) return null;
+        return {
+          equivalentRate: (currentEquivalent - previousEquivalent) / previousEquivalent,
+          equivalentDelta: currentEquivalent - previousEquivalent,
+          rawRate: (currentRaw - previousRaw) / previousRaw,
+          rawDelta: currentRaw - previousRaw,
+        };
+      })
+      .filter(Boolean);
+    const currentSpeed = speedSamples[0] ?? null;
+    if (!currentSpeed) return null;
+
+    const speedStrength = Math.abs(currentSpeed.equivalentRate);
+    const speedStrengthRank = speedSamples.length >= 20
+      ? Math.round(
+        ((
+          speedSamples.filter((sample) => Math.abs(sample.equivalentRate) < speedStrength).length +
+          speedSamples.filter((sample) => Math.abs(sample.equivalentRate) === speedStrength).length / 2
+        ) / speedSamples.length) * 1000
+      ) / 10
+      : null;
+    const isIncrease = currentSpeed.equivalentRate >= 0;
+    return {
+      key,
+      label,
       value: speedStrengthRank,
       current: currentSpeed.equivalentRate,
       currentDelta: currentSpeed.equivalentDelta,
       rawRate: currentSpeed.rawRate,
       rawDelta: currentSpeed.rawDelta,
-      formula: "等值多單 = 小台散戶看多 + 微台散戶看多 / 5；速度強度位階以近45日等值多單日變動率絕對值取中間排名。",
-      crowding: speedLabel,
+      formula,
+      crowding: isIncrease
+        ? speedStrengthRank !== null && speedStrengthRank >= 80 ? `${increased}加速` : increased
+        : speedStrengthRank !== null && speedStrengthRank >= 80 ? `${decreased}加速` : decreased,
       type: "velocity",
-      tone,
-    });
-  }
+      tone: isIncrease ? "positive" : "negative",
+    };
+  };
+  const longVelocity = buildVelocityMetric({
+    key: "equivalentLongVelocity",
+    label: "等值多單增減速度",
+    equivalent: equivalentLong,
+    raw: rawLong,
+    formula: "等值多單 = 小台散戶看多 + 微台散戶看多 / 5；速度強度位階以近45日等值多單日變動率絕對值取中間排名。",
+    increased: "追多",
+    decreased: "去槓桿",
+  });
+  const shortVelocity = buildVelocityMetric({
+    key: "equivalentShortVelocity",
+    label: "等值空單增減速度",
+    equivalent: equivalentShort,
+    raw: rawShort,
+    formula: "等值空單 = 小台散戶看空 + 微台散戶看空 / 5；速度強度位階以近45日等值空單日變動率絕對值取中間排名。",
+    increased: "空單加碼",
+    decreased: "空單回補",
+  });
+  [longVelocity, shortVelocity].filter(Boolean).forEach((metric) => metrics.push(metric));
   const longRank = metrics[0].value;
   const shortRank = metrics[1].value;
   const assessment = longRank !== null && shortRank !== null && longRank >= 80 && shortRank >= 80
@@ -1419,7 +1439,7 @@ function buildRetailPositionPanel(position) {
 
   const note = document.createElement("p");
   note.className = "retail-position-note";
-  note.textContent = `存量位階以近45日相對位階（同值取中間排名）計算；速度卡以等值多單的日變動率絕對值衡量加速強度。紅色表示多單增加、綠色表示多單下降，顏色不是方向建議。`;
+  note.textContent = `存量位階以近45日相對位階（同值取中間排名）計算；速度卡以等值多空單的日變動率絕對值衡量加速強度。紅橘色表示部位增加，青綠色表示多單去槓桿或空單回補；顏色不是方向建議。`;
   panel.appendChild(note);
   return panel;
 }
