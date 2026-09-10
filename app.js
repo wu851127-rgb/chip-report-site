@@ -164,16 +164,26 @@ function buildRetailPositionFromHistory(historyReports) {
   const equivalentLong = (values) => values["散戶看多"] + values["微台散戶看多"] / 5;
   const equivalentShort = (values) => values["散戶看空"] + values["微台散戶看空"] / 5;
   const equivalentNet = (values) => equivalentLong(values) - equivalentShort(values);
+  const longShare = (values) => {
+    const total = equivalentLong(values) + equivalentShort(values);
+    return total ? equivalentLong(values) / total : 0;
+  };
+  const shortShare = (values) => {
+    const total = equivalentLong(values) + equivalentShort(values);
+    return total ? equivalentShort(values) / total : 0;
+  };
   const rawLong = (values) => values["散戶看多"] + values["微台散戶看多"];
   const rawShort = (values) => values["散戶看空"] + values["微台散戶看空"];
   const metricDefinitions = [
     ["equivalentLong", "散戶多方位階", equivalentLong, "小台散戶看多 + 微台散戶看多 / 5", "多方擁擠"],
     ["equivalentShort", "散戶空方位階", equivalentShort, "小台散戶看空 + 微台散戶看空 / 5", "空方擁擠"],
     ["equivalentNet", "散戶淨多空位階", equivalentNet, "小台＋微台等值多單 - 小台＋微台等值空單", "淨多偏高"],
+    ["longShare", "散戶多單持倉占比", longShare, "等值多單 / (等值多單 + 等值空單)", "多方持倉偏高", "share"],
+    ["shortShare", "散戶空單持倉占比", shortShare, "等值空單 / (等值多單 + 等值空單)", "空方持倉偏高", "share"],
     ["microRatio", "微台多空比位階", (values) => values["微台散戶多空比"], "微台散戶多空比", "微台追價偏熱"],
   ];
   const canRank = samples.length >= 20;
-  const metrics = metricDefinitions.map(([key, label, calculate, formula, crowding]) => {
+  const metrics = metricDefinitions.map(([key, label, calculate, formula, crowding, type]) => {
     const currentValue = calculate(current);
     const values = samples.map(calculate);
     const below = values.filter((value) => value < currentValue).length;
@@ -185,6 +195,7 @@ function buildRetailPositionFromHistory(historyReports) {
       current: currentValue,
       formula,
       crowding,
+      type,
     };
   });
   const buildVelocityMetric = ({ key, label, equivalent, raw, formula, increased, decreased }) => {
@@ -253,6 +264,37 @@ function buildRetailPositionFromHistory(historyReports) {
     decreased: "空單回補",
   });
   [longVelocity, shortVelocity].filter(Boolean).forEach((metric) => metrics.push(metric));
+  const history = samples.map((values, index) => {
+    const previous = samples[index + 1];
+    const long = equivalentLong(values);
+    const short = equivalentShort(values);
+    const previousLong = previous ? equivalentLong(previous) : null;
+    const previousShort = previous ? equivalentShort(previous) : null;
+    return {
+      date: historyReports[index]?.date ?? "",
+      equivalentLong: long,
+      equivalentShort: short,
+      longShare: longShare(values),
+      shortShare: shortShare(values),
+      longVelocity: previousLong ? (long - previousLong) / previousLong : null,
+      shortVelocity: previousShort ? (short - previousShort) / previousShort : null,
+    };
+  });
+  const historyMidrank = (values, current, absolute = false) => {
+    const normalized = values.map((value) => absolute ? Math.abs(value) : value);
+    const target = absolute ? Math.abs(current) : current;
+    const below = normalized.filter((value) => value < target).length;
+    const equal = normalized.filter((value) => value === target).length;
+    return Math.round(((below + equal / 2) / normalized.length) * 1000) / 10;
+  };
+  const longVelocityHistory = history.map((item) => item.longVelocity).filter((value) => value !== null);
+  const shortVelocityHistory = history.map((item) => item.shortVelocity).filter((value) => value !== null);
+  history.forEach((item) => {
+    item.longShareRank = historyMidrank(history.map((sample) => sample.longShare), item.longShare);
+    item.shortShareRank = historyMidrank(history.map((sample) => sample.shortShare), item.shortShare);
+    item.longVelocityRank = item.longVelocity === null ? null : historyMidrank(longVelocityHistory, item.longVelocity, true);
+    item.shortVelocityRank = item.shortVelocity === null ? null : historyMidrank(shortVelocityHistory, item.shortVelocity, true);
+  });
   const longRank = metrics[0].value;
   const shortRank = metrics[1].value;
   const assessment = longRank !== null && shortRank !== null && longRank >= 80 && shortRank >= 80
@@ -270,6 +312,7 @@ function buildRetailPositionFromHistory(historyReports) {
     rankFormula: "近45日相對位階（同值取中間排名）= (低於本日筆數 + 同值筆數 / 2) / 樣本數 x 100。",
     assessment,
     metrics,
+    history,
   };
 }
 
@@ -1395,7 +1438,7 @@ function buildRetailPositionPanel(position) {
   title.textContent = "散戶位階圖";
   const meta = document.createElement("div");
   meta.className = "retail-position-meta";
-  meta.textContent = `${position.window ?? 45} 日樣本 / ${position.sampleCount ?? 0} 筆 / 等值口數＋速度`;
+  meta.textContent = `${position.window ?? 45} 日樣本 / 等值口數 / 結算日排除到期契約`;
   head.append(title, meta);
 
   const assessment = document.createElement("div");
@@ -1405,22 +1448,53 @@ function buildRetailPositionPanel(position) {
   head.appendChild(assessment);
   panel.appendChild(head);
 
+  const metricMap = new Map(position.metrics.map((metric) => [metric.key, metric]));
+  const coreKeys = ["equivalentLongVelocity", "equivalentShortVelocity", "longShare", "shortShare"];
   const grid = document.createElement("div");
-  grid.className = "retail-position-grid";
-  for (const metric of position.metrics) {
+  grid.className = "retail-position-grid retail-position-grid-core";
+  const meterRefs = new Map();
+
+  const selectedState = (key, sample) => {
+    const metric = metricMap.get(key);
+    if (!metric) return null;
+    if (key === "equivalentLongVelocity" || key === "equivalentShortVelocity") {
+      const long = key === "equivalentLongVelocity";
+      const speed = long ? sample.longVelocity : sample.shortVelocity;
+      const rank = long ? sample.longVelocityRank : sample.shortVelocityRank;
+      const increase = speed !== null && speed >= 0;
+      return {
+        metric,
+        primary: speed === null ? "樣本不足" : formatSignedPercent(speed),
+        rank,
+        caption: speed === null
+          ? "沒有足夠前一交易日資料。"
+          : `${increase ? (long ? "多單加碼" : "空單加碼") : (long ? "多單去槓桿" : "空單回補")}｜速度強度 ${rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}%`}`,
+        tone: increase ? "is-increase" : "is-decrease",
+      };
+    }
+    const long = key === "longShare";
+    const share = long ? sample.longShare : sample.shortShare;
+    const rank = long ? sample.longShareRank : sample.shortShareRank;
+    const equivalent = long ? sample.equivalentLong : sample.equivalentShort;
+    return {
+      metric,
+      primary: `${renderValue(share * 100, "0.0")}%`,
+      rank,
+      caption: `等值留倉 ${renderValue(equivalent, "#,##0.0")} 口｜水位位階 ${rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}%`}`,
+      tone: long ? "is-long-share" : "is-short-share",
+    };
+  };
+
+  const createMeter = (key) => {
+    const metric = metricMap.get(key);
+    if (!metric) return null;
     const item = document.createElement("article");
-    item.className = `retail-meter retail-meter-${metric.key ?? "neutral"}${metric.type === "velocity" ? ` is-velocity is-velocity-${metric.tone}` : ""}`;
+    item.className = `retail-meter retail-meter-${key}`;
     const metricHead = document.createElement("div");
     metricHead.className = "retail-meter-head";
     const label = document.createElement("span");
     label.textContent = metric.label ?? "位階";
-    const rank = numericValue(metric.value);
     const value = document.createElement("strong");
-    const isVelocity = metric.type === "velocity";
-    const speed = numericValue(metric.current);
-    value.textContent = isVelocity
-      ? speed === null ? "樣本不足" : formatSignedPercent(speed)
-      : rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}%`;
     metricHead.append(label, value);
     item.appendChild(metricHead);
 
@@ -1428,32 +1502,94 @@ function buildRetailPositionPanel(position) {
     track.className = "retail-meter-track";
     const fill = document.createElement("span");
     fill.className = "retail-meter-fill";
-    fill.style.width = `${Math.max(0, Math.min(100, rank ?? 0))}%`;
+    // The selected-date handler applies the actual rank after every hover/click.
+    fill.style.width = "0%";
     track.appendChild(fill);
     item.appendChild(track);
 
     const caption = document.createElement("p");
-    const current = numericValue(metric.current);
-    const currentText = metric.key === "microRatio"
-      ? `${current === null ? "—" : renderValue(current, "0.00") + "%"}`
-      : `${current === null ? "—" : renderValue(current, "#,##0.0")} 口`;
-    caption.textContent = isVelocity
-      ? `${metric.crowding}｜速度強度 ${rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}%`}｜等值變動 ${formatSignedNumber(numericValue(metric.currentDelta), 1)} 口｜原始口數對照 ${formatSignedPercent(numericValue(metric.rawRate))}（${formatSignedNumber(numericValue(metric.rawDelta))} 口）`
-      : `現值 ${currentText} / ${metric.formula ?? ""}`;
-    if (isVelocity) {
-      const formula = document.createElement("p");
-      formula.className = "retail-meter-formula";
-      formula.textContent = metric.formula ?? "";
-      item.appendChild(formula);
-    }
     item.appendChild(caption);
-    grid.appendChild(item);
+    meterRefs.set(key, { item, value, fill, caption });
+    return item;
+  };
+
+  for (const key of coreKeys) {
+    const meter = createMeter(key);
+    if (meter) grid.appendChild(meter);
   }
   panel.appendChild(grid);
 
+  const history = Array.isArray(position.history) ? position.history.filter((item) => item.date) : [];
+  const interactive = document.createElement("div");
+  interactive.className = "retail-history";
+  const historyHead = document.createElement("div");
+  historyHead.className = "retail-history-head";
+  const historyLabel = document.createElement("span");
+  historyLabel.textContent = "45 日部位軌跡";
+  const historyDate = document.createElement("strong");
+  historyHead.append(historyLabel, historyDate);
+  interactive.appendChild(historyHead);
+
+  const historyTrack = document.createElement("div");
+  historyTrack.className = "retail-history-track";
+  interactive.appendChild(historyTrack);
+
+  const detail = document.createElement("p");
+  detail.className = "retail-history-detail";
+  interactive.appendChild(detail);
+
+  const inventory = document.createElement("div");
+  inventory.className = "retail-position-inventory";
+  const inventoryTitle = document.createElement("span");
+  inventoryTitle.textContent = "等值留倉明細";
+  const inventoryValues = document.createElement("strong");
+  inventory.append(inventoryTitle, inventoryValues);
+  panel.appendChild(interactive);
+  panel.appendChild(inventory);
+
+  const points = new Map();
+  const updateSelected = (index) => {
+    const sample = history[index];
+    if (!sample) return;
+    historyDate.textContent = sample.date;
+    for (const key of coreKeys) {
+      const state = selectedState(key, sample);
+      const refs = meterRefs.get(key);
+      if (!state || !refs) continue;
+      refs.value.textContent = state.primary;
+      refs.caption.textContent = state.caption;
+      refs.fill.style.width = `${Math.max(0, Math.min(100, state.rank ?? 0))}%`;
+      refs.item.classList.toggle("is-increase", state.tone === "is-increase");
+      refs.item.classList.toggle("is-decrease", state.tone === "is-decrease");
+      refs.item.classList.toggle("is-long-share", state.tone === "is-long-share");
+      refs.item.classList.toggle("is-short-share", state.tone === "is-short-share");
+    }
+    const longAction = sample.longVelocity === null ? "多單資料不足" : sample.longVelocity >= 0 ? "多單加碼" : "多單去槓桿";
+    const shortAction = sample.shortVelocity === null ? "空單資料不足" : sample.shortVelocity >= 0 ? "空單加碼" : "空單回補";
+    detail.textContent = `${longAction} ${sample.longVelocity === null ? "" : formatSignedPercent(sample.longVelocity)}；${shortAction} ${sample.shortVelocity === null ? "" : formatSignedPercent(sample.shortVelocity)}。水位為多單 ${renderValue(sample.longShare * 100, "0.0")}%／空單 ${renderValue(sample.shortShare * 100, "0.0")}% 。`;
+    inventoryValues.textContent = `多 ${renderValue(sample.equivalentLong, "#,##0.0")}｜空 ${renderValue(sample.equivalentShort, "#,##0.0")}｜淨 ${renderValue(sample.equivalentLong - sample.equivalentShort, "#,##0.0")} 口`;
+    points.forEach((point, pointIndex) => point.classList.toggle("is-active", pointIndex === index));
+  };
+
+  history.slice().reverse().forEach((sample, reverseIndex) => {
+    const index = history.length - 1 - reverseIndex;
+    const point = document.createElement("button");
+    point.type = "button";
+    point.className = "retail-history-point";
+    point.style.setProperty("--point-height", `${Math.round(18 + sample.longShare * 70)}%`);
+    point.setAttribute("aria-label", `${sample.date}，多單占比 ${renderValue(sample.longShare * 100, "0.0")}%`);
+    point.title = `${sample.date}｜多 ${renderValue(sample.longShare * 100, "0.0")}%｜空 ${renderValue(sample.shortShare * 100, "0.0")}%`;
+    point.addEventListener("pointerenter", () => updateSelected(index));
+    point.addEventListener("focus", () => updateSelected(index));
+    point.addEventListener("click", () => updateSelected(index));
+    historyTrack.appendChild(point);
+    points.set(index, point);
+  });
+  if (history.length) updateSelected(0);
+
   const note = document.createElement("p");
   note.className = "retail-position-note";
-  note.textContent = `存量位階以近45日相對位階（同值取中間排名）計算；速度卡以等值多空單的日變動率絕對值衡量加速強度。紅橘色表示部位增加，青綠色表示多單去槓桿或空單回補；顏色不是方向建議。`;
+  note.textContent = `移動游標至軌跡任一日，可同步查看當日四項結構。水位以等值多空持倉占比計算，速度以等值多空單日變動率的絕對強度排名；結算日已排除到期契約。顏色只用於辨識部位與變化，不是方向建議。`;
   panel.appendChild(note);
   return panel;
 }
@@ -1553,7 +1689,7 @@ async function loadReport(date, updateQuery = true) {
   const report = await fetchReport(date);
   const historyReports = await loadHistoryReports(date, 46);
   const dashboardSections = (report.dashboard.sections ?? []).map((section) => {
-    if (section.title !== "散戶" || section.retailPosition) return section;
+    if (section.title !== "散戶") return section;
     return { ...section, retailPosition: buildRetailPositionFromHistory(historyReports) };
   });
   state.currentDate = date;
