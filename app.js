@@ -3,6 +3,7 @@ const state = {
   currentDate: null,
   reportCache: new Map(),
   researchFramework: null,
+  deskViewOverrides: null,
 };
 
 const els = {
@@ -1405,7 +1406,11 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
 }
 
 function renderStrategy(report, historyReports = []) {
-  const strategy = buildStrategyView(report, historyReports, state.researchFramework);
+  // Editorial views are date-specific summaries of the report's public figures.
+  // They take precedence when present, while all other dates keep the calculated view.
+  const strategy =
+    state.deskViewOverrides?.[report.date] ??
+    buildStrategyView(report, historyReports, state.researchFramework);
   els.strategyPanel.hidden = false;
   els.strategyPanel.classList.remove("tone-bull", "tone-bear", "tone-risk", "tone-neutral");
   els.strategyPanel.classList.add(`tone-${strategy.tone}`);
@@ -1687,6 +1692,14 @@ async function loadResearchFramework() {
   }
 }
 
+async function loadDeskViewOverrides() {
+  try {
+    return await fetchJson("./data/reports/desk-view-overrides.json");
+  } catch (_error) {
+    return {};
+  }
+}
+
 async function loadHistoryReports(date, limit = 5) {
   const dates = (state.index?.reports ?? []).map((item) => item.date);
   const start = dates.indexOf(date);
@@ -1696,7 +1709,10 @@ async function loadHistoryReports(date, limit = 5) {
 }
 
 async function loadIndex() {
-  state.researchFramework = await loadResearchFramework();
+  [state.researchFramework, state.deskViewOverrides] = await Promise.all([
+    loadResearchFramework(),
+    loadDeskViewOverrides(),
+  ]);
   state.index = await fetchJson("./data/reports/index.json");
   const dateFromQuery = new URLSearchParams(window.location.search).get("date");
   state.currentDate = dateFromQuery || state.index.latestDate;
