@@ -862,6 +862,8 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
   const retailMicroRatio = getCardValue(cards, "微台散戶多空比");
   const retailLongRank = getCardValue(cards, "散戶多方位階(45日)");
   const retailShortRank = getCardValue(cards, "散戶空方位階(45日)");
+  const retailLongShareRank = getCardValue(cards, "散戶多單持倉占比位階(45日)");
+  const retailShortShareRank = getCardValue(cards, "散戶空單持倉占比位階(45日)");
   const retailNetRank = getCardValue(cards, "散戶淨多空位階(45日)");
   const microRatioRank = getCardValue(cards, "微台多空比位階(45日)");
   const prevRetailNet = getCardValue(prevCards, "散戶未平倉");
@@ -878,14 +880,28 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
     (dealerCpRatio !== null && dealerCpRatio >= 8);
   const futuresHedgeExtreme =
     foreignFutVsSettle !== null && Math.abs(foreignFutVsSettle) >= 20_000;
-  const retailChasingLong =
+  const retailLongParticipation =
     (retailNet !== null && retailNet > 0) ||
     (retailMicroNet !== null && retailMicroNet > 0) ||
     (retailMicroRatio !== null && retailMicroRatio >= 15) ||
     (retailLongRank !== null && retailLongRank >= 80) ||
     (microRatioRank !== null && microRatioRank >= 80);
-  const retailCrowdedLong = retailLongRank !== null && retailLongRank >= 80;
-  const retailCrowdedShort = retailShortRank !== null && retailShortRank >= 80;
+  const retailCrowdedLong =
+    (retailLongShareRank !== null && retailLongShareRank >= 80) ||
+    (retailLongShareRank === null && retailLongRank !== null && retailLongRank >= 80);
+  const retailCrowdedShort =
+    (retailShortShareRank !== null && retailShortShareRank >= 80) ||
+    (retailShortShareRank === null && retailShortRank !== null && retailShortRank >= 80);
+  const retailSkepticalShort =
+    retailShortShareRank !== null &&
+    retailShortShareRank >= 70 &&
+    (retailLongShareRank === null || retailLongShareRank < 80);
+  const retailFomoLong =
+    retailLongShareRank !== null &&
+    retailLongShareRank >= 80 &&
+    !retailSkepticalShort;
+  // A positive retail net alone is not FOMO when the position mix is still short-heavy.
+  const retailChasingLong = retailLongParticipation && !retailSkepticalShort;
   const retailLeverageCrowded = retailCrowdedLong && retailCrowdedShort;
   const optionOverheatSignal = largeBcPosition && dealerHot;
   const putDefenseSignal =
@@ -1198,10 +1214,12 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
       : `自營端買權熱度目前尚未全面失控，可視為次要確認訊號；若後續與外資買權槓桿共振，才需要把短線過熱權重進一步拉高。`;
   const retailPositionView = retailLeverageCrowded
     ? `散戶位階顯示多方 ${renderValue(retailLongRank, "0.0")}%、空方 ${renderValue(retailShortRank, "0.0")}%，屬雙向槓桿偏高；優先防範波動放大，不可把單一位階當成方向訊號。`
-    : retailCrowdedLong
-      ? `散戶等值多單位階 ${renderValue(retailLongRank, "0.0")}%、微台比位階 ${microRatioRank !== null ? `${renderValue(microRatioRank, "0.0")}%` : "—"}，多方部位偏擁擠；這是追價與回測風險提醒，不單獨構成偏空結論。`
-      : retailCrowdedShort
-        ? `散戶等值空單位階 ${renderValue(retailShortRank, "0.0")}% 偏高；價格一旦止穩應留意軋空彈性，但不單獨構成偏多結論。`
+    : retailFomoLong
+      ? `散戶多單持倉占比位階 ${renderValue(retailLongShareRank, "0.0")}%、等值多單位階 ${renderValue(retailLongRank, "0.0")}%，多方部位偏擁擠；這是追價與回測風險提醒，不單獨構成偏空結論。`
+      : retailSkepticalShort
+        ? `散戶空單持倉占比位階 ${renderValue(retailShortShareRank, "0.0")}% 偏高、但多單占比未擁擠，屬市場仍有懷疑的高空單結構；價格未轉弱前可保留軋空延續的可能，但不構成追價理由。`
+        : retailCrowdedShort
+          ? `散戶等值空單位階 ${renderValue(retailShortRank, "0.0")}% 偏高；價格一旦止穩應留意軋空彈性，但不單獨構成偏多結論。`
         : retailNetRank !== null
           ? `散戶 45 日位階未見極端擁擠（淨多空位階 ${renderValue(retailNetRank, "0.0")}%）；結構是否延續仍以外資期貨與選擇權為主。`
           : "散戶位階樣本尚在累積，暫不以此作為方向判斷。";
@@ -1661,7 +1679,9 @@ async function fetchReport(date) {
 
 async function loadResearchFramework() {
   try {
-    return await fetchJson("./data/research/framework.json");
+    // This file exists only in the local workspace. Public Pages deliberately
+    // receives no source articles, notes, or full research framework.
+    return await fetchJson("./.private/research-framework.json");
   } catch (_error) {
     return null;
   }
