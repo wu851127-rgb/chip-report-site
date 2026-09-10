@@ -726,6 +726,19 @@ function renderStrategyBlocks(blocks, tone) {
     .join("");
 }
 
+function mergeStrategyBlocks(baseBlocks, overrideBlocks) {
+  if (!Array.isArray(overrideBlocks) || overrideBlocks.length === 0) return baseBlocks;
+
+  const overridesByLabel = new Map(
+    overrideBlocks
+      .filter((block) => block?.label && block?.text)
+      .map((block) => [block.label, block])
+  );
+  const merged = baseBlocks.map((block) => overridesByLabel.get(block.label) ?? block);
+  const knownLabels = new Set(baseBlocks.map((block) => block.label));
+  return merged.concat(overrideBlocks.filter((block) => block?.label && !knownLabels.has(block.label)));
+}
+
 function uniqueStrings(values) {
   return [...new Set((values ?? []).filter((value) => typeof value === "string" && value.trim()))];
 }
@@ -1406,11 +1419,16 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
 }
 
 function renderStrategy(report, historyReports = []) {
-  // Editorial views are date-specific summaries of the report's public figures.
-  // They take precedence when present, while all other dates keep the calculated view.
-  const strategy =
-    state.deskViewOverrides?.[report.date] ??
-    buildStrategyView(report, historyReports, state.researchFramework);
+  const calculatedStrategy = buildStrategyView(report, historyReports, state.researchFramework);
+  const dateOverride = state.deskViewOverrides?.[report.date];
+  // Keep the full calculated framework and replace only the verified date-specific blocks.
+  const strategy = dateOverride
+    ? {
+        ...calculatedStrategy,
+        ...dateOverride,
+        blocks: mergeStrategyBlocks(calculatedStrategy.blocks, dateOverride.blocks),
+      }
+    : calculatedStrategy;
   els.strategyPanel.hidden = false;
   els.strategyPanel.classList.remove("tone-bull", "tone-bear", "tone-risk", "tone-neutral");
   els.strategyPanel.classList.add(`tone-${strategy.tone}`);
