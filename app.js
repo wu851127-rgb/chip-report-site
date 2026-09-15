@@ -1762,15 +1762,12 @@ function bindCardInteraction(node, card, sectionTitle) {
   node.addEventListener("pointerleave", () => hideCardTooltip());
   node.addEventListener("focus", () => showCardTooltip(node, card, groups));
   node.addEventListener("blur", () => hideCardTooltip());
-  node.addEventListener("click", () => {
-    if (els.cardTooltip.hidden) showCardTooltip(node, card, groups);
-    else hideCardTooltip();
-  });
+  // Click always opens the card detail so focus + click works consistently on touch screens.
+  node.addEventListener("click", () => showCardTooltip(node, card, groups));
   node.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    if (els.cardTooltip.hidden) showCardTooltip(node, card, groups);
-    else hideCardTooltip();
+    showCardTooltip(node, card, groups);
   });
 }
 
