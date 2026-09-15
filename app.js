@@ -8,10 +8,12 @@ const state = {
 };
 
 const els = {
+  sidebar: document.querySelector("#sidebar"),
   historyList: document.querySelector("#historyList"),
   historyMonthFilter: document.querySelector("#historyMonthFilter"),
   historyMeta: document.querySelector("#historyMeta"),
   historyLatestButton: document.querySelector("#historyLatestButton"),
+  historyToggleButton: document.querySelector("#historyToggleButton"),
   heroTitle: document.querySelector("#heroTitle"),
   heroSubtitle: document.querySelector("#heroSubtitle"),
   statusLatestDate: document.querySelector("#statusLatestDate"),
@@ -442,11 +444,19 @@ function buildScPressureMetric({ label, rank, raw, formula, tone }) {
   fill.style.width = `${Math.max(0, Math.min(100, rank ?? 0))}%`;
   track.appendChild(fill);
 
-  const formulaLine = document.createElement("p");
-  formulaLine.className = "sc-pressure-formula";
-  formulaLine.textContent = formula;
-  item.append(head, value, rawLine, track, formulaLine);
+  item.append(head, value, rawLine, track);
   return item;
+}
+
+function buildPanelDisclosure(summaryText, detailText) {
+  const disclosure = document.createElement("details");
+  disclosure.className = "panel-disclosure";
+  const summary = document.createElement("summary");
+  summary.textContent = summaryText;
+  const detail = document.createElement("p");
+  detail.textContent = detailText;
+  disclosure.append(summary, detail);
+  return disclosure;
 }
 
 function renderScPressurePanel(snapshot) {
@@ -465,23 +475,25 @@ function renderScPressurePanel(snapshot) {
   const heading = document.createElement("div");
   const title = document.createElement("div");
   title.className = "sc-pressure-title";
-  title.textContent = "上漲日 SC 壓力監測";
+  title.textContent = snapshot.isUpDay ? "上漲日 SC 壓力監測" : "SC 壓力｜下跌日改看輪廓";
   const meta = document.createElement("p");
   meta.className = "sc-pressure-meta";
-  meta.textContent = `透明試算｜近 ${snapshot.window} 筆交易快照中的 ${snapshot.sampleCount} 筆上漲日樣本`;
+  meta.textContent = snapshot.isUpDay
+    ? `透明試算｜近 ${snapshot.window} 筆交易快照中的 ${snapshot.sampleCount} 筆上漲日樣本`
+    : "下跌日不以 CALL 賣方壓力百分位評分";
   heading.append(title, meta);
   const status = document.createElement("span");
   const highestRank = Math.max(snapshot.speedRank ?? 0, snapshot.strictRank ?? 0);
   const statusTone = snapshot.isUpDay ? scPressureTone(highestRank) : "is-muted";
   status.className = `sc-pressure-status ${statusTone}`;
-  status.textContent = snapshot.isUpDay ? scPressureLabel(highestRank) : "下跌日未評分";
+  status.textContent = snapshot.isUpDay ? scPressureLabel(highestRank) : "改看 CALL／PUT";
   head.append(heading, status);
   panel.appendChild(head);
 
   if (!snapshot.isUpDay) {
     const inactive = document.createElement("p");
     inactive.className = "sc-pressure-inactive";
-    inactive.textContent = "此指標只在加權指數上漲日比較 Call 賣方壓力；下跌日請改看 Call 是否收斂、Put 留倉與散戶位階。";
+    inactive.textContent = "下跌日：SC 壓力百分位不評分。請優先看下方「選擇權輪廓」的 CALL 壓力是否收斂、PUT 防守是否升高，再交叉比對散戶位階。";
     panel.appendChild(inactive);
   } else {
     const grid = document.createElement("div");
@@ -503,12 +515,16 @@ function renderScPressurePanel(snapshot) {
       })
     );
     panel.appendChild(grid);
+    panel.appendChild(buildPanelDisclosure(
+      "查看 SC 指標口徑",
+      "SC 增加速度＝（今日 SC 口數－前日 SC 口數）÷ 前日 SC 口數；嚴格 SC 壓力＝SC 金額日增幅－BC 金額日增幅。兩者皆只在加權指數上漲日，與近45筆快照中的上漲日樣本比較並取中間排名。"
+    ));
   }
 
   const note = document.createElement("p");
   note.className = "sc-pressure-note";
   note.textContent = "色彩只代表 Call 賣方壓力等級，不代表大盤漲跌方向。資料來源：TAIFEX 外資 BC／SC 未平倉口數與金額；百分位為本站透明試算，非期交所官方欄位。";
-  panel.appendChild(note);
+  if (snapshot.isUpDay) panel.appendChild(note);
 }
 
 function midrankFromValues(values, current) {
@@ -593,10 +609,7 @@ function buildOptionContourMetric({ side, value, change, rank, formula }) {
   fill.style.width = `${Math.max(0, Math.min(100, rank ?? 0))}%`;
   track.appendChild(fill);
 
-  const formulaLine = document.createElement("p");
-  formulaLine.className = "option-contour-formula";
-  formulaLine.textContent = formula;
-  item.append(head, total, unit, delta, track, formulaLine);
+  item.append(head, total, unit, delta, track);
   return item;
 }
 
@@ -650,10 +663,11 @@ function renderOptionContourPanel(snapshot) {
   interpretation.textContent = `本日輪廓：CALL 端較前日${snapshot.callChange > 0 ? "增加" : snapshot.callChange < 0 ? "減少" : "持平"} ${renderValue(Math.abs(snapshot.callChange), "#,##0")}；PUT 端較前日${snapshot.putChange > 0 ? "增加" : snapshot.putChange < 0 ? "減少" : "持平"} ${renderValue(Math.abs(snapshot.putChange), "#,##0")}。存量與增減必須一起看，不可單憑其中一側直接判定多空。`;
   panel.appendChild(interpretation);
 
-  const legend = document.createElement("p");
-  legend.className = "option-contour-legend";
-  legend.textContent = "色碼：橘紅＝CALL 上檔壓力；藍紫＝PUT 下檔防守；青綠＝CALL 壓力收斂；灰＝持平或防守減弱。";
-  panel.appendChild(legend);
+  panel.appendChild(buildPanelDisclosure(
+    "查看輪廓口徑與色碼",
+    "CALL 端壓力＝SC 金額－BC 金額；PUT 端防守＝BP 金額－SP 金額；今日增減＝今日數值－前日數值。橘紅代表 CALL 上檔壓力、藍紫代表 PUT 下檔防守、青綠代表 CALL 壓力收斂、灰色代表持平或防守減弱。"
+  ));
+
 }
 
 function firstSentence(value, fallback = "—") {
@@ -1607,20 +1621,49 @@ function renderStrategy(report, historyReports = []) {
   return strategy;
 }
 
-function buildCard(card) {
+function isDirectionalCard(label) {
+  return /漲跌|買賣超|增減|變化量|留倉差/.test(label ?? "");
+}
+
+function cardSignalLabel(label, value) {
+  if (value === null || value === 0) return "持平";
+  const positive = value > 0;
+  if (/買賣超/.test(label ?? "")) return positive ? "買超" : "賣超";
+  if (/漲跌/.test(label ?? "")) return positive ? "上漲" : "下跌";
+  return positive ? "增加" : "減少";
+}
+
+function isPrimaryDashboardCard(sectionTitle, label) {
+  const primaryLabels = {
+    "大盤資訊": ["加權指數", "加權指數漲跌"],
+    "外資布局": ["外資現貨買賣超", "外資(大小台)期貨未平倉"],
+    "自營布局": ["自營(自行)現貨買賣超", "自營(大小台)期貨未平倉"],
+  };
+  return primaryLabels[sectionTitle]?.includes(label) ?? false;
+}
+
+function buildCard(card, sectionTitle = "") {
   const node = els.cardTemplate.content.firstElementChild.cloneNode(true);
   if (card.alert) node.classList.add("card-alert");
   const numeric = numericValue(card.value);
+  const directional = isDirectionalCard(card.label);
   if (card.alert) {
     node.classList.add("card-risk");
-  } else if (numeric !== null) {
+  } else if (directional && numeric !== null) {
     if (numeric > 0) node.classList.add("card-bull");
     if (numeric < 0) node.classList.add("card-bear");
   }
+  if (isPrimaryDashboardCard(sectionTitle, card.label)) node.classList.add("card-primary");
   const badge = node.querySelector(".card-alert-badge");
+  const signal = node.querySelector(".card-signal");
   if (card.alertLabel) {
     badge.hidden = false;
     badge.textContent = card.alertLabel;
+  }
+  if (directional && numeric !== null) {
+    signal.hidden = false;
+    signal.classList.add(numeric > 0 ? "is-up" : numeric < 0 ? "is-down" : "is-flat");
+    signal.textContent = `${numeric > 0 ? "▲" : numeric < 0 ? "▼" : "■"} ${cardSignalLabel(card.label, numeric)}`;
   }
   node.querySelector(".card-label").textContent = card.label ?? "";
   node.querySelector(".card-value").textContent = renderValue(card.value, card.numFmt ?? "");
@@ -1800,12 +1843,14 @@ function buildRetailPositionPanel(position) {
 
 function buildSection(section) {
   const node = els.sectionTemplate.content.firstElementChild.cloneNode(true);
+  node.classList.add(`section-${String(section.title ?? "").replaceAll(/[^a-zA-Z0-9]/g, "") || "data"}`);
   node.querySelector("h3").textContent = section.title ?? "";
+  node.querySelector(".section-meta").textContent = `${section.cards?.length ?? 0} 項資料`;
   const grid = node.querySelector(".card-grid");
   const retailPanel = buildRetailPositionPanel(section.retailPosition);
   if (retailPanel) grid.before(retailPanel);
   for (const card of section.cards ?? []) {
-    grid.appendChild(buildCard(card));
+    grid.appendChild(buildCard(card, section.title ?? ""));
   }
   return node;
 }
@@ -1975,8 +2020,15 @@ function bindTabs() {
       Object.entries(els.views).forEach(([name, view]) => {
         view.classList.toggle("is-active", name === next);
       });
+      els.tabs.forEach((item) => item.setAttribute("aria-selected", String(item === tab)));
     });
   });
+}
+
+function setHistoryCollapsed(collapsed) {
+  els.sidebar.classList.toggle("is-history-collapsed", collapsed);
+  els.historyToggleButton.setAttribute("aria-expanded", String(!collapsed));
+  els.historyToggleButton.textContent = collapsed ? "展開" : "收合";
 }
 
 els.refreshButton.addEventListener("click", async () => {
@@ -1984,6 +2036,7 @@ els.refreshButton.addEventListener("click", async () => {
 });
 
 bindTabs();
+els.tabs.forEach((tab) => tab.setAttribute("aria-selected", String(tab.classList.contains("is-active"))));
 els.historyMonthFilter.addEventListener("change", () => {
   state.historyMonth = els.historyMonthFilter.value;
   renderHistory(state.index);
@@ -1995,6 +2048,12 @@ els.historyLatestButton.addEventListener("click", () => {
   state.historyMonth = dateMonth(latestDate);
   loadReport(latestDate);
 });
+
+els.historyToggleButton.addEventListener("click", () => {
+  setHistoryCollapsed(!els.sidebar.classList.contains("is-history-collapsed"));
+});
+
+if (window.matchMedia("(max-width: 1024px)").matches) setHistoryCollapsed(true);
 
 loadIndex().catch((error) => {
   els.heroTitle.textContent = "資料載入失敗";

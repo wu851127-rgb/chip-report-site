@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>台股盤後籌碼儀表板</title>
-    <link rel="stylesheet" href="./styles.css?v=20260915-market-pulse" />
+    <link rel="stylesheet" href="./styles.css?v=20260915-information-layout" />
   </head>
   <body>
     <div class="shell">
-      <aside class="sidebar">
+      <aside id="sidebar" class="sidebar">
         <div class="brand">
           <p class="eyebrow">Daily Chip Flow</p>
           <h1>台股盤後籌碼</h1>
@@ -21,6 +21,7 @@
               <small id="historyMeta" class="history-meta">載入中</small>
             </div>
             <div class="history-actions">
+              <button id="historyToggleButton" class="history-toggle-button" type="button" aria-expanded="true">收合</button>
               <button id="historyLatestButton" type="button">最新</button>
               <button id="refreshButton" type="button">更新</button>
             </div>
@@ -58,8 +59,8 @@
         </section>
 
         <section class="tabs">
-          <button class="tab is-active" data-tab="dashboard" type="button">主表</button>
-          <button class="tab" data-tab="detail" type="button">Sheet1</button>
+          <button class="tab is-active" data-tab="dashboard" type="button">主表｜市場總覽</button>
+          <button class="tab" data-tab="detail" type="button">選擇權細項</button>
         </section>
 
         <section id="dashboardView" class="view is-active">
@@ -96,6 +97,7 @@
       <section class="section-block">
         <div class="section-head">
           <h3></h3>
+          <span class="section-meta"></span>
         </div>
         <div class="card-grid"></div>
       </section>
@@ -104,6 +106,7 @@
     <template id="cardTemplate">
       <article class="card">
         <div class="card-top">
+          <span class="card-signal" hidden></span>
           <span class="card-alert-badge" hidden></span>
         </div>
         <p class="card-label"></p>
@@ -112,6 +115,6 @@
       </article>
     </template>
 
-    <script type="module" src="./app.js?v=20260915-market-pulse"></script>
+    <script type="module" src="./app.js?v=20260915-information-layout"></script>
   </body>
 </html>

@@ -142,6 +142,10 @@ body {
   gap: 5px;
 }
 
+.history-toggle-button {
+  display: none;
+}
+
 #refreshButton,
 .download-link,
 .tab {
@@ -149,7 +153,8 @@ body {
 }
 
 #refreshButton,
-#historyLatestButton {
+#historyLatestButton,
+#historyToggleButton {
   border: 1px solid var(--line-strong);
   background: rgba(255, 176, 0, 0.08);
   color: var(--text);
@@ -776,6 +781,12 @@ body {
   font-size: 17px;
 }
 
+.section-meta {
+  color: var(--muted);
+  font: 500 9px var(--mono);
+  letter-spacing: 0.08em;
+}
+
 .retail-position-panel {
   margin: 0 0 10px;
   border: 1px solid var(--line-strong);
@@ -1106,6 +1117,15 @@ body {
   margin-bottom: 12px;
 }
 
+.sc-pressure-panel.is-not-scored .sc-pressure-head {
+  margin-bottom: 0;
+}
+
+.sc-pressure-panel.is-not-scored .sc-pressure-inactive {
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
 .sc-pressure-title {
   color: var(--accent-strong);
   font-size: 12px;
@@ -1207,6 +1227,30 @@ body {
   margin-top: 11px;
   padding-top: 9px;
   border-top: 1px solid var(--line);
+}
+
+.panel-disclosure {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font: 500 9px/1.5 var(--mono);
+}
+
+.panel-disclosure summary {
+  width: max-content;
+  cursor: pointer;
+  color: #b7c5d5;
+  letter-spacing: 0.05em;
+}
+
+.panel-disclosure summary:hover {
+  color: var(--accent-strong);
+}
+
+.panel-disclosure p {
+  margin: 7px 0 0;
+  color: var(--muted);
 }
 
 .sc-pressure-metric.is-normal,
@@ -1398,6 +1442,11 @@ body {
   gap: 10px;
 }
 
+.card-primary {
+  grid-column: span 2;
+  min-height: 144px;
+}
+
 .card {
   position: relative;
   overflow: hidden;
@@ -1437,6 +1486,33 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.card-signal {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 5px;
+  border: 1px solid rgba(143, 163, 187, 0.22);
+  color: var(--neutral);
+  background: rgba(143, 163, 187, 0.06);
+  font: 800 9px var(--mono);
+  letter-spacing: 0.06em;
+}
+
+.card-signal.is-up {
+  color: #ffb1ae;
+  border-color: rgba(255, 91, 87, 0.3);
+  background: rgba(255, 91, 87, 0.08);
+}
+
+.card-signal.is-down {
+  color: #a5f0c8;
+  border-color: rgba(47, 207, 122, 0.3);
+  background: rgba(47, 207, 122, 0.08);
+}
+
+.card-signal.is-flat {
+  color: #bdcad9;
 }
 
 .card-alert-badge {
@@ -1544,8 +1620,26 @@ body {
     max-height: 208px;
   }
 
+  .history-toggle-button {
+    display: inline-flex;
+  }
+
+  .sidebar.is-history-collapsed .history-filter-label,
+  .sidebar.is-history-collapsed .history-month-filter,
+  .sidebar.is-history-collapsed .history-list {
+    display: none;
+  }
+
+  .sidebar.is-history-collapsed .history-panel {
+    gap: 0;
+  }
+
   .market-pulse-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-primary {
+    grid-column: span 1;
   }
 
   .content {
