@@ -860,7 +860,7 @@ function renderStrategyBlocks(blocks, tone) {
         : `
           <div class="strategy-evidence-links" aria-label="${label} 對應資料卡">
             ${evidenceLinks.map((link) => `
-              <button class="strategy-evidence-link" type="button" data-evidence-groups="${link.groups.join(" ")}">
+              <button class="strategy-evidence-link" type="button" data-relation-groups="${link.groups.join(" ")}">
                 <span>DATA</span>${escapeHtml(link.label)}
               </button>
             `).join("")}
