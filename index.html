@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>台股盤後籌碼儀表板</title>
-    <link rel="stylesheet" href="./styles.css?v=20260915-terminal-tags" />
+    <link rel="stylesheet" href="./styles.css?v=20260915-card-insights" />
   </head>
   <body>
     <div class="shell">
@@ -115,6 +115,14 @@
       </article>
     </template>
 
-    <script type="module" src="./app.js?v=20260915-terminal-tags"></script>
+    <aside id="cardTooltip" class="card-tooltip" role="tooltip" hidden>
+      <p class="card-tooltip-kicker">RELATED DATA</p>
+      <p class="card-tooltip-title"></p>
+      <p class="card-tooltip-value"></p>
+      <p class="card-tooltip-note"></p>
+      <p class="card-tooltip-insight"></p>
+    </aside>
+
+    <script type="module" src="./app.js?v=20260915-card-insights"></script>
   </body>
 </html>

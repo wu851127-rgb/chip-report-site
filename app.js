@@ -39,6 +39,7 @@ const els = {
   refreshButton: document.querySelector("#refreshButton"),
   sectionTemplate: document.querySelector("#sectionTemplate"),
   cardTemplate: document.querySelector("#cardTemplate"),
+  cardTooltip: document.querySelector("#cardTooltip"),
 };
 
 function countDecimalsFromFormat(numFmt) {
@@ -677,9 +678,10 @@ function firstSentence(value, fallback = "—") {
   return match ? match[0] : text;
 }
 
-function buildPulseCell({ label, value, detail, tone = "neutral", signal = "" }) {
+function buildPulseCell({ label, value, detail, tone = "neutral", signal = "", relationGroups = [] }) {
   const item = document.createElement("article");
   item.className = `market-pulse-cell tone-${tone}`;
+  item.dataset.relationGroups = relationGroups.join(" ");
   const head = document.createElement("div");
   head.className = "market-pulse-cell-head";
   const name = document.createElement("span");
@@ -732,6 +734,7 @@ function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
     detail: `當日漲跌 ${indexMove}`,
     tone: determineFlowTone(indexChange),
     signal: marketSignal,
+    relationGroups: ["market-price"],
   }));
 
   const futuresSignal = futuresDelta === null
@@ -747,6 +750,7 @@ function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
     detail: `前日增減 ${formatSignedNumber(futuresDelta)} 口`,
     tone: determineFlowTone(futuresDelta),
     signal: futuresSignal,
+    relationGroups: ["foreign-flow"],
   }));
 
   const optionSignal = !optionSnapshot
@@ -769,6 +773,7 @@ function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
     detail: "依外資未平倉金額的當日變化計算",
     tone: optionTone,
     signal: optionSignal,
+    relationGroups: ["foreign-call", "foreign-put"],
   }));
 
   const retailAssessment = retailPosition?.assessment ?? "資料不足";
@@ -781,6 +786,7 @@ function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
     detail: "近 45 日等值部位相對水位",
     tone: retailTone,
     signal: retailAssessment,
+    relationGroups: ["retail-long", "retail-short", "retail-net", "retail-micro"],
   }));
   panel.appendChild(grid);
 }
@@ -1642,6 +1648,132 @@ function isPrimaryDashboardCard(sectionTitle, label) {
   return primaryLabels[sectionTitle]?.includes(label) ?? false;
 }
 
+const relationDescriptions = {
+  "market-price": "市場基準：以指數、成交與波動資料確認當日價格結構。",
+  "market-credit": "信用結構：融資與融券用於觀察槓桿是否擴張或收斂。",
+  "position-rollover": "轉倉結構：結算日前後的留倉跳動需先排除換月影響。",
+  "foreign-flow": "外資期貨／現貨：需交叉比對部位方向與前日變化，不以單一數字定多空。",
+  "foreign-call": "外資 CALL 端：比較 BC、SC 存量與增減，確認上檔壓力是否被消化。",
+  "foreign-put": "外資 PUT 端：比較 BP、SP 日增量；SP 訊號以口數增量為主條件。",
+  "dealer-flow": "自營期貨／現貨：多為次級確認，宜與外資主導結構一起判讀。",
+  "dealer-call": "自營 CALL 端：觀察券商買權槓桿與賣方壓力是否同步放大。",
+  "dealer-put": "自營 PUT 端：觀察防守與承接是否改變，不能直接視為方向結論。",
+  "retail-long": "散戶多方：多單增加速度與持倉位階需同時看，避免只解讀單一高低點。",
+  "retail-short": "散戶空方：空單口數與持倉占比要一起判讀，才可評估軋空燃料。",
+  "retail-net": "散戶淨部位：用於觀察散戶是否縮手、追價或轉為擁擠。",
+  "retail-micro": "微台結構：以五口微台換算一口小台後，再與小台合併比較。",
+};
+
+function cardRelationGroups(label, sectionTitle = "") {
+  const text = `${sectionTitle} ${label ?? ""}`;
+  const groups = [];
+  const add = (group) => {
+    if (!groups.includes(group)) groups.push(group);
+  };
+
+  if (/加權|PCR/.test(text)) add("market-price");
+  if (/融資|融券/.test(text)) add("market-credit");
+  if (/結算日|當次月.*留倉|ROLLOVER/.test(text)) add("position-rollover");
+
+  if (/外資/.test(text)) {
+    if (/期貨|現貨|買賣超/.test(text)) add("foreign-flow");
+    if (/BC|SC|\(買\)OP|買方買權|買權\/賣權比/.test(text)) add("foreign-call");
+    if (/BP|SP|\(賣\)OP/.test(text)) add("foreign-put");
+  }
+
+  if (/自營/.test(text)) {
+    if (/期貨|現貨|買賣超/.test(text)) add("dealer-flow");
+    if (/BC|SC|\(買\)OP|買方買權/.test(text)) add("dealer-call");
+    if (/BP|SP|\(賣\)OP/.test(text)) add("dealer-put");
+  }
+
+  if (/散戶|小台|微台/.test(text)) {
+    if (/多單|看多|多方/.test(text)) add("retail-long");
+    if (/空單|看空|空方/.test(text)) add("retail-short");
+    if (/淨多空|散戶未平倉|留倉差/.test(text)) add("retail-net");
+    if (/微台/.test(text)) add("retail-micro");
+  }
+
+  return groups;
+}
+
+function nodeRelationGroups(node) {
+  return (node.dataset.relationGroups ?? "").split(" ").filter(Boolean);
+}
+
+function setRelationActivity(groups) {
+  const active = new Set(groups);
+  document.querySelectorAll("[data-relation-groups]").forEach((node) => {
+    const isRelated = nodeRelationGroups(node).some((group) => active.has(group));
+    node.classList.toggle("relation-active", isRelated);
+  });
+}
+
+function quickRead(card, groups, numeric) {
+  const summary = relationDescriptions[groups[0]] ?? "欄位之間的關聯以同色群組微亮提示。";
+  if (!isDirectionalCard(card.label) || numeric === null) return summary;
+  return `當日數值${cardSignalLabel(card.label, numeric)}。${summary}`;
+}
+
+function positionCardTooltip(anchor) {
+  const tooltip = els.cardTooltip;
+  const margin = 14;
+  const offset = 14;
+  const rect = anchor instanceof Element
+    ? anchor.getBoundingClientRect()
+    : { left: anchor.x, right: anchor.x, top: anchor.y, bottom: anchor.y };
+  const box = tooltip.getBoundingClientRect();
+  const preferRight = rect.right + offset + box.width <= window.innerWidth - margin;
+  const left = preferRight ? rect.right + offset : rect.left - box.width - offset;
+  const top = Math.min(Math.max(margin, rect.top), window.innerHeight - box.height - margin);
+  tooltip.style.left = `${Math.max(margin, left)}px`;
+  tooltip.style.top = `${top}px`;
+}
+
+function showCardTooltip(node, card, groups, anchor = node) {
+  const tooltip = els.cardTooltip;
+  tooltip.querySelector(".card-tooltip-title").textContent = card.label ?? "欄位說明";
+  tooltip.querySelector(".card-tooltip-value").textContent = renderValue(card.value, card.numFmt ?? "");
+  tooltip.querySelector(".card-tooltip-note").textContent = card.note ?? "此欄位暫無補充口徑。";
+  tooltip.querySelector(".card-tooltip-insight").textContent = quickRead(card, groups, numericValue(card.value));
+  tooltip.hidden = false;
+  setRelationActivity(groups);
+  positionCardTooltip(anchor);
+}
+
+function hideCardTooltip() {
+  els.cardTooltip.hidden = true;
+  document.querySelectorAll(".relation-active").forEach((node) => node.classList.remove("relation-active"));
+}
+
+function bindCardInteraction(node, card, sectionTitle) {
+  const groups = cardRelationGroups(card.label, sectionTitle);
+  node.dataset.relationGroups = groups.join(" ");
+  node.tabIndex = 0;
+  node.setAttribute("role", "button");
+  node.setAttribute("aria-label", `${card.label ?? "欄位"}：${renderValue(card.value, card.numFmt ?? "")}。可查看欄位口徑與關聯資料。`);
+
+  node.addEventListener("pointerenter", (event) => {
+    if (event.pointerType !== "touch") showCardTooltip(node, card, groups, event);
+  });
+  node.addEventListener("pointermove", (event) => {
+    if (!els.cardTooltip.hidden && event.pointerType !== "touch") positionCardTooltip(event);
+  });
+  node.addEventListener("pointerleave", () => hideCardTooltip());
+  node.addEventListener("focus", () => showCardTooltip(node, card, groups));
+  node.addEventListener("blur", () => hideCardTooltip());
+  node.addEventListener("click", () => {
+    if (els.cardTooltip.hidden) showCardTooltip(node, card, groups);
+    else hideCardTooltip();
+  });
+  node.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    if (els.cardTooltip.hidden) showCardTooltip(node, card, groups);
+    else hideCardTooltip();
+  });
+}
+
 function buildCard(card, sectionTitle = "") {
   const node = els.cardTemplate.content.firstElementChild.cloneNode(true);
   if (card.alert) node.classList.add("card-alert");
@@ -1668,6 +1800,7 @@ function buildCard(card, sectionTitle = "") {
   node.querySelector(".card-label").textContent = card.label ?? "";
   node.querySelector(".card-value").textContent = renderValue(card.value, card.numFmt ?? "");
   node.querySelector(".card-note").textContent = card.note ?? "";
+  bindCardInteraction(node, card, sectionTitle);
   return node;
 }
 
