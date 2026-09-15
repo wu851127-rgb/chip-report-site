@@ -159,6 +159,29 @@ function getReportCardValue(report, label, { detail = false } = {}) {
   return getCardValue(cards, label);
 }
 
+function getSectionCardValue(report, sectionTitle, label) {
+  for (const view of [report?.dashboard, report?.detail]) {
+    for (const section of view?.sections ?? []) {
+      if (section.title !== sectionTitle) continue;
+      const card = (section.cards ?? []).find((item) => item.label === label);
+      if (card) return numericValue(card.value);
+    }
+  }
+  return null;
+}
+
+function buildCardTrend(historyReports, sectionTitle, card, limit = 7) {
+  const samples = historyReports
+    .slice(0, limit)
+    .map((report) => ({
+      date: report?.date ?? "",
+      value: getSectionCardValue(report, sectionTitle, card.label),
+    }))
+    .filter((sample) => sample.date && sample.value !== null)
+    .reverse();
+  return samples.length >= 2 ? samples : [];
+}
+
 function buildRetailPositionFromHistory(historyReports) {
   const requiredLabels = ["散戶看多", "散戶看空", "微台散戶看多", "微台散戶看空", "微台散戶多空比"];
   const samples = historyReports
@@ -1820,7 +1843,87 @@ function bindCardInteraction(node, card, sectionTitle) {
   });
 }
 
-function buildCard(card, sectionTitle = "") {
+function buildCardSparkline(card, samples) {
+  if (samples.length < 2) return null;
+  const width = 124;
+  const height = 31;
+  const padding = 3;
+  const values = samples.map((sample) => sample.value);
+  let low = Math.min(...values);
+  let high = Math.max(...values);
+  if (low === high) {
+    const allowance = Math.abs(low || 1) * 0.08;
+    low -= allowance;
+    high += allowance;
+  }
+  const xAt = (index) => padding + (index / (samples.length - 1)) * (width - padding * 2);
+  const yAt = (value) => height - padding - ((value - low) / (high - low)) * (height - padding * 2);
+  const points = samples.map((sample, index) => ({ ...sample, x: xAt(index), y: yAt(sample.value) }));
+  const latest = points.at(-1);
+  const first = points[0];
+  const movement = latest.value - first.value;
+  const directional = isDirectionalCard(card.label);
+  const tone = directional ? (movement > 0 ? "bull" : movement < 0 ? "bear" : "neutral") : "neutral";
+  const shell = document.createElement("div");
+  shell.className = `card-sparkline card-sparkline-${tone}`;
+  shell.setAttribute("aria-label", `${card.label}近 ${samples.length} 個交易日變化`);
+
+  const head = document.createElement("div");
+  head.className = "card-sparkline-head";
+  const label = document.createElement("span");
+  label.textContent = `${samples.length}D TREND`;
+  const detail = document.createElement("strong");
+  const updateDetail = (sample) => {
+    detail.textContent = `${sample.date.slice(5).replace("-", "/")}  ${renderValue(sample.value, card.numFmt ?? "")}`;
+  };
+  updateDetail(latest);
+  head.append(label, detail);
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "card-sparkline-chart");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `${card.label}：${samples.map((sample) => `${sample.date} ${renderValue(sample.value, card.numFmt ?? "")}`).join("；")}`);
+  const zeroY = low <= 0 && high >= 0 ? yAt(0) : null;
+  if (zeroY !== null) {
+    const baseline = document.createElementNS(svg.namespaceURI, "line");
+    baseline.setAttribute("class", "card-sparkline-baseline");
+    baseline.setAttribute("x1", "0");
+    baseline.setAttribute("x2", String(width));
+    baseline.setAttribute("y1", String(zeroY));
+    baseline.setAttribute("y2", String(zeroY));
+    svg.appendChild(baseline);
+  }
+  const path = document.createElementNS(svg.namespaceURI, "path");
+  path.setAttribute("class", "card-sparkline-line");
+  path.setAttribute("d", points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" "));
+  svg.appendChild(path);
+  for (const point of points) {
+    const dot = document.createElementNS(svg.namespaceURI, "circle");
+    dot.setAttribute("class", `card-sparkline-dot${point === latest ? " is-latest" : ""}`);
+    dot.setAttribute("cx", String(point.x));
+    dot.setAttribute("cy", String(point.y));
+    dot.setAttribute("r", point === latest ? "2.7" : "1.35");
+    dot.setAttribute("tabindex", "0");
+    dot.setAttribute("role", "button");
+    dot.setAttribute("aria-label", `${point.date}：${renderValue(point.value, card.numFmt ?? "")}`);
+    dot.addEventListener("pointerenter", (event) => {
+      event.stopPropagation();
+      updateDetail(point);
+    });
+    dot.addEventListener("focus", () => updateDetail(point));
+    dot.addEventListener("click", (event) => {
+      event.stopPropagation();
+      updateDetail(point);
+    });
+    svg.appendChild(dot);
+  }
+  svg.addEventListener("pointerleave", () => updateDetail(latest));
+  shell.append(head, svg);
+  return shell;
+}
+
+function buildCard(card, sectionTitle = "", historyReports = []) {
   const node = els.cardTemplate.content.firstElementChild.cloneNode(true);
   if (card.alert) node.classList.add("card-alert");
   const numeric = numericValue(card.value);
@@ -1846,6 +1949,11 @@ function buildCard(card, sectionTitle = "") {
   node.querySelector(".card-label").textContent = card.label ?? "";
   node.querySelector(".card-value").textContent = renderValue(card.value, card.numFmt ?? "");
   node.querySelector(".card-note").textContent = card.note ?? "";
+  const sparkline = buildCardSparkline(card, buildCardTrend(historyReports, sectionTitle, card));
+  if (sparkline) {
+    node.classList.add("card-has-sparkline");
+    node.querySelector(".card-note").before(sparkline);
+  }
   bindCardInteraction(node, card, sectionTitle);
   return node;
 }
@@ -2020,7 +2128,7 @@ function buildRetailPositionPanel(position) {
   return panel;
 }
 
-function buildSection(section) {
+function buildSection(section, historyReports = []) {
   const node = els.sectionTemplate.content.firstElementChild.cloneNode(true);
   node.classList.add(`section-${String(section.title ?? "").replaceAll(/[^a-zA-Z0-9]/g, "") || "data"}`);
   node.querySelector("h3").textContent = section.title ?? "";
@@ -2029,15 +2137,15 @@ function buildSection(section) {
   const retailPanel = buildRetailPositionPanel(section.retailPosition);
   if (retailPanel) grid.before(retailPanel);
   for (const card of section.cards ?? []) {
-    grid.appendChild(buildCard(card, section.title ?? ""));
+    grid.appendChild(buildCard(card, section.title ?? "", historyReports));
   }
   return node;
 }
 
-function renderSections(container, sections) {
+function renderSections(container, sections, historyReports = []) {
   container.replaceChildren();
   for (const section of sections ?? []) {
-    container.appendChild(buildSection(section));
+    container.appendChild(buildSection(section, historyReports));
   }
 }
 
@@ -2185,8 +2293,8 @@ async function loadReport(date, updateQuery = true) {
   buildMarketPulse(report, strategy, optionContour, retailPosition);
   renderScPressurePanel(buildScPressureSnapshot(historyReports));
   renderOptionContourPanel(optionContour);
-  renderSections(els.dashboardSections, dashboardSections);
-  renderSections(els.detailSections, report.detail.sections);
+  renderSections(els.dashboardSections, dashboardSections, historyReports);
+  renderSections(els.detailSections, report.detail.sections, historyReports);
   renderStatus(state.index, state.currentDate);
   renderHistory(state.index);
 }
