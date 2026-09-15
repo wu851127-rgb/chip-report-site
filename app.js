@@ -4,10 +4,14 @@ const state = {
   reportCache: new Map(),
   researchFramework: null,
   deskViewOverrides: null,
+  historyMonth: null,
 };
 
 const els = {
   historyList: document.querySelector("#historyList"),
+  historyMonthFilter: document.querySelector("#historyMonthFilter"),
+  historyMeta: document.querySelector("#historyMeta"),
+  historyLatestButton: document.querySelector("#historyLatestButton"),
   heroTitle: document.querySelector("#heroTitle"),
   heroSubtitle: document.querySelector("#heroSubtitle"),
   statusLatestDate: document.querySelector("#statusLatestDate"),
@@ -19,7 +23,9 @@ const els = {
   strategyPanel: document.querySelector("#strategyPanel"),
   strategyFlag: document.querySelector("#strategyFlag"),
   strategyTone: document.querySelector("#strategyTone"),
+  strategyDecision: document.querySelector("#strategyDecision"),
   strategyBody: document.querySelector("#strategyBody"),
+  marketPulse: document.querySelector("#marketPulse"),
   scPressurePanel: document.querySelector("#scPressurePanel"),
   optionContourPanel: document.querySelector("#optionContourPanel"),
   downloadLink: document.querySelector("#downloadLink"),
@@ -648,6 +654,121 @@ function renderOptionContourPanel(snapshot) {
   legend.className = "option-contour-legend";
   legend.textContent = "色碼：橘紅＝CALL 上檔壓力；藍紫＝PUT 下檔防守；青綠＝CALL 壓力收斂；灰＝持平或防守減弱。";
   panel.appendChild(legend);
+}
+
+function firstSentence(value, fallback = "—") {
+  const text = String(value ?? "").trim();
+  if (!text) return fallback;
+  const match = text.match(/^.*?[。！？]/);
+  return match ? match[0] : text;
+}
+
+function buildPulseCell({ label, value, detail, tone = "neutral", signal = "" }) {
+  const item = document.createElement("article");
+  item.className = `market-pulse-cell tone-${tone}`;
+  const head = document.createElement("div");
+  head.className = "market-pulse-cell-head";
+  const name = document.createElement("span");
+  name.textContent = label;
+  const tag = document.createElement("span");
+  tag.className = "market-pulse-tag";
+  tag.textContent = signal || "觀察";
+  head.append(name, tag);
+
+  const primary = document.createElement("strong");
+  primary.textContent = value;
+  const note = document.createElement("p");
+  note.textContent = detail;
+  item.append(head, primary, note);
+  return item;
+}
+
+function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
+  const cards = collectCards(report);
+  const indexLevel = getCardRender(cards, "加權指數");
+  const indexChange = getCardValue(cards, "加權指數漲跌");
+  const indexMove = getCardRender(cards, "加權指數漲跌");
+  const futures = getCardValue(cards, "外資(大小台)期貨未平倉");
+  const futuresDelta = getCardValue(cards, "外資期貨未平倉與前日增減");
+  const metrics = new Map((retailPosition?.metrics ?? []).map((item) => [item.key, item]));
+  const longShare = metrics.get("longShare")?.current;
+  const shortShare = metrics.get("shortShare")?.current;
+
+  const panel = els.marketPulse;
+  panel.replaceChildren();
+  panel.hidden = false;
+
+  const head = document.createElement("div");
+  head.className = "market-pulse-head";
+  const title = document.createElement("div");
+  title.className = "market-pulse-title";
+  title.textContent = "Market Pulse";
+  const meta = document.createElement("p");
+  meta.className = "market-pulse-meta";
+  meta.textContent = "先看四項關鍵結構；完整依據於下方 Desk View 與資料卡。";
+  head.append(title, meta);
+  panel.appendChild(head);
+
+  const grid = document.createElement("div");
+  grid.className = "market-pulse-grid";
+  const marketSignal = indexChange === null ? "資料不足" : indexChange > 0 ? "收紅" : indexChange < 0 ? "收黑" : "平盤";
+  grid.appendChild(buildPulseCell({
+    label: "大盤動能",
+    value: indexLevel,
+    detail: `當日漲跌 ${indexMove}`,
+    tone: determineFlowTone(indexChange),
+    signal: marketSignal,
+  }));
+
+  const futuresSignal = futuresDelta === null
+    ? "資料不足"
+    : futuresDelta > 0
+      ? futures !== null && futures < 0 ? "空單回補" : "部位增加"
+      : futuresDelta < 0
+        ? futures !== null && futures < 0 ? "空單加碼" : "部位減碼"
+        : "部位持平";
+  grid.appendChild(buildPulseCell({
+    label: "外資期貨",
+    value: futures === null ? "—" : `${renderValue(futures, "#,##0")} 口`,
+    detail: `前日增減 ${formatSignedNumber(futuresDelta)} 口`,
+    tone: determineFlowTone(futuresDelta),
+    signal: futuresSignal,
+  }));
+
+  const optionSignal = !optionSnapshot
+    ? "資料不足"
+    : optionSnapshot.callChange < 0 && optionSnapshot.putChange >= 0
+      ? "結構改善"
+      : optionSnapshot.callChange > 0 && optionSnapshot.putChange < 0
+        ? "雙向轉弱"
+        : `${changeLabel(optionSnapshot.callChange, "call")}／${changeLabel(optionSnapshot.putChange, "put")}`;
+  const optionTone = !optionSnapshot
+    ? "neutral"
+    : optionSnapshot.callChange > 0 && optionSnapshot.putChange < 0
+      ? "risk"
+      : optionSnapshot.callChange < 0 && optionSnapshot.putChange >= 0
+        ? "bull"
+        : "neutral";
+  grid.appendChild(buildPulseCell({
+    label: "選擇權輪廓",
+    value: optionSnapshot ? `CALL ${formatSignedNumber(optionSnapshot.callChange)}｜PUT ${formatSignedNumber(optionSnapshot.putChange)}` : "—",
+    detail: "依外資未平倉金額的當日變化計算",
+    tone: optionTone,
+    signal: optionSignal,
+  }));
+
+  const retailAssessment = retailPosition?.assessment ?? "資料不足";
+  const retailTone = retailAssessment.includes("雙向") ? "risk" : "neutral";
+  grid.appendChild(buildPulseCell({
+    label: "散戶位階",
+    value: longShare === undefined || shortShare === undefined
+      ? "—"
+      : `多 ${renderValue(longShare, "0.0%")}｜空 ${renderValue(shortShare, "0.0%")}`,
+    detail: "近 45 日等值部位相對水位",
+    tone: retailTone,
+    signal: retailAssessment,
+  }));
+  panel.appendChild(grid);
 }
 
 function average(values) {
@@ -1441,7 +1562,49 @@ function renderStrategy(report, historyReports = []) {
   }
   els.strategyTone.textContent = strategy.toneLabel;
   els.strategyTone.className = `strategy-tone tone-${strategy.tone}`;
-  els.strategyBody.innerHTML = renderStrategyBlocks(strategy.blocks ?? [{ label: "Desk View", text: strategy.body }], strategy.tone);
+  const blocks = strategy.blocks ?? [{ label: "Desk View", text: strategy.body }];
+  const blockByLabel = new Map(blocks.map((block) => [block.label, block]));
+  const decisionItems = [
+    {
+      label: "主命題",
+      value: strategy.flag || firstSentence(blockByLabel.get("主命題")?.text, "盤勢結構判讀"),
+      note: strategy.flag ? firstSentence(blockByLabel.get("主命題")?.text) : "以今日籌碼結構定位",
+      tone: strategy.tone,
+    },
+    {
+      label: "方向結論",
+      value: strategy.toneLabel,
+      note: "訊號不是單日預測，需搭配下方條件驗證。",
+      tone: strategy.tone,
+    },
+    {
+      label: "部位節奏",
+      value: firstSentence(blockByLabel.get("部位節奏")?.text, "依結構分段處理"),
+      note: "先設定條件，再決定加碼或降檔。",
+      tone: "neutral",
+    },
+    {
+      label: "失效條件",
+      value: firstSentence(blockByLabel.get("反證風險")?.text, "持續追蹤反證風險"),
+      note: "若失效，應優先收斂風險，不以單一數值硬拗。",
+      tone: "risk",
+    },
+  ];
+  els.strategyDecision.replaceChildren();
+  for (const item of decisionItems) {
+    const node = document.createElement("article");
+    node.className = `strategy-decision-item tone-${item.tone}`;
+    const label = document.createElement("span");
+    label.textContent = item.label;
+    const value = document.createElement("strong");
+    value.textContent = item.value;
+    const note = document.createElement("p");
+    note.textContent = item.note;
+    node.append(label, value, note);
+    els.strategyDecision.appendChild(node);
+  }
+  els.strategyBody.innerHTML = renderStrategyBlocks(blocks.filter((block) => block.label !== "主命題"), strategy.tone);
+  return strategy;
 }
 
 function buildCard(card) {
@@ -1519,7 +1682,7 @@ function buildRetailPositionPanel(position) {
     const equivalent = long ? sample.equivalentLong : sample.equivalentShort;
     return {
       metric,
-      primary: `${renderValue(share * 100, "0.0")}%`,
+      primary: renderValue(share, "0.0%"),
       rank,
       caption: `等值留倉 ${renderValue(equivalent, "#,##0.0")} 口｜水位位階 ${rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}%`}`,
       tone: long ? "is-long-share" : "is-short-share",
@@ -1607,7 +1770,7 @@ function buildRetailPositionPanel(position) {
     }
     const longAction = sample.longVelocity === null ? "多單資料不足" : sample.longVelocity >= 0 ? "多單加碼" : "多單去槓桿";
     const shortAction = sample.shortVelocity === null ? "空單資料不足" : sample.shortVelocity >= 0 ? "空單加碼" : "空單回補";
-    detail.textContent = `${longAction} ${sample.longVelocity === null ? "" : formatSignedPercent(sample.longVelocity)}；${shortAction} ${sample.shortVelocity === null ? "" : formatSignedPercent(sample.shortVelocity)}。水位為多單 ${renderValue(sample.longShare * 100, "0.0")}%／空單 ${renderValue(sample.shortShare * 100, "0.0")}% 。`;
+    detail.textContent = `${longAction} ${sample.longVelocity === null ? "" : formatSignedPercent(sample.longVelocity)}；${shortAction} ${sample.shortVelocity === null ? "" : formatSignedPercent(sample.shortVelocity)}。水位為多單 ${renderValue(sample.longShare, "0.0%")}／空單 ${renderValue(sample.shortShare, "0.0%")} 。`;
     inventoryValues.textContent = `多 ${renderValue(sample.equivalentLong, "#,##0.0")}｜空 ${renderValue(sample.equivalentShort, "#,##0.0")}｜淨 ${renderValue(sample.equivalentLong - sample.equivalentShort, "#,##0.0")} 口`;
     points.forEach((point, pointIndex) => point.classList.toggle("is-active", pointIndex === index));
   };
@@ -1618,8 +1781,8 @@ function buildRetailPositionPanel(position) {
     point.type = "button";
     point.className = "retail-history-point";
     point.style.setProperty("--point-height", `${Math.round(18 + sample.longShare * 70)}%`);
-    point.setAttribute("aria-label", `${sample.date}，多單占比 ${renderValue(sample.longShare * 100, "0.0")}%`);
-    point.title = `${sample.date}｜多 ${renderValue(sample.longShare * 100, "0.0")}%｜空 ${renderValue(sample.shortShare * 100, "0.0")}%`;
+    point.setAttribute("aria-label", `${sample.date}，多單占比 ${renderValue(sample.longShare, "0.0%")}`);
+    point.title = `${sample.date}｜多 ${renderValue(sample.longShare, "0.0%")}｜空 ${renderValue(sample.shortShare, "0.0%")}`;
     point.addEventListener("pointerenter", () => updateSelected(index));
     point.addEventListener("focus", () => updateSelected(index));
     point.addEventListener("click", () => updateSelected(index));
@@ -1654,17 +1817,51 @@ function renderSections(container, sections) {
   }
 }
 
+function dateMonth(date) {
+  return String(date ?? "").slice(0, 7);
+}
+
+function monthLabel(month) {
+  const [year, value] = String(month).split("-");
+  return year && value ? `${year} 年 ${value} 月` : month;
+}
+
 function renderHistory(index) {
+  const reports = index.reports ?? [];
+  const months = [...new Set(reports.map((report) => dateMonth(report.date)).filter(Boolean))];
+  const preferredMonth = dateMonth(state.currentDate);
+  if (!state.historyMonth || !months.includes(state.historyMonth)) {
+    state.historyMonth = preferredMonth || months[0] || null;
+  }
+
+  els.historyMonthFilter.replaceChildren();
+  for (const month of months) {
+    const option = document.createElement("option");
+    option.value = month;
+    option.textContent = monthLabel(month);
+    option.selected = month === state.historyMonth;
+    els.historyMonthFilter.appendChild(option);
+  }
+
+  const visibleReports = reports.filter((report) => dateMonth(report.date) === state.historyMonth);
+  els.historyMeta.textContent = `${monthLabel(state.historyMonth)} · ${visibleReports.length} 筆`;
   els.historyList.replaceChildren();
-  for (const report of index.reports ?? []) {
+  for (const report of visibleReports) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "history-item";
     if (report.date === state.currentDate) button.classList.add("is-active");
-    button.innerHTML = `
-      <span class="history-date">${report.date}</span>
-      <span>${report.title ?? ""}</span>
-    `;
+    const date = document.createElement("span");
+    date.className = "history-date";
+    date.textContent = report.date.slice(5).replace("-", "/");
+    const copy = document.createElement("span");
+    copy.className = "history-item-copy";
+    copy.textContent = report.date === state.currentDate
+      ? "正在檢視"
+      : report.date === index.latestDate
+        ? "最新快照"
+        : "盤後快照";
+    button.append(date, copy);
     button.addEventListener("click", () => loadReport(report.date));
     els.historyList.appendChild(button);
   }
@@ -1742,9 +1939,10 @@ async function loadIndex() {
 async function loadReport(date, updateQuery = true) {
   const report = await fetchReport(date);
   const historyReports = await loadHistoryReports(date, 46);
+  const retailPosition = buildRetailPositionFromHistory(historyReports);
   const dashboardSections = (report.dashboard.sections ?? []).map((section) => {
     if (section.title !== "散戶") return section;
-    return { ...section, retailPosition: buildRetailPositionFromHistory(historyReports) };
+    return { ...section, retailPosition };
   });
   state.currentDate = date;
   if (updateQuery) {
@@ -1758,9 +1956,11 @@ async function loadReport(date, updateQuery = true) {
   els.dashboardSummary.textContent = report.dashboard.summary ?? "";
   els.downloadLink.href = report.xlsxHref ?? "#";
 
-  renderStrategy(report, historyReports);
+  const strategy = renderStrategy(report, historyReports);
+  const optionContour = buildOptionContourSnapshot(historyReports);
+  buildMarketPulse(report, strategy, optionContour, retailPosition);
   renderScPressurePanel(buildScPressureSnapshot(historyReports));
-  renderOptionContourPanel(buildOptionContourSnapshot(historyReports));
+  renderOptionContourPanel(optionContour);
   renderSections(els.dashboardSections, dashboardSections);
   renderSections(els.detailSections, report.detail.sections);
   renderStatus(state.index, state.currentDate);
@@ -1784,6 +1984,18 @@ els.refreshButton.addEventListener("click", async () => {
 });
 
 bindTabs();
+els.historyMonthFilter.addEventListener("change", () => {
+  state.historyMonth = els.historyMonthFilter.value;
+  renderHistory(state.index);
+});
+
+els.historyLatestButton.addEventListener("click", () => {
+  const latestDate = state.index?.latestDate;
+  if (!latestDate) return;
+  state.historyMonth = dateMonth(latestDate);
+  loadReport(latestDate);
+});
+
 loadIndex().catch((error) => {
   els.heroTitle.textContent = "資料載入失敗";
   els.heroSubtitle.textContent = error.message;

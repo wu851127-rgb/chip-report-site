@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>台股盤後籌碼儀表板</title>
-    <link rel="stylesheet" href="./styles.css?v=20260910-retail-position-history" />
+    <link rel="stylesheet" href="./styles.css?v=20260915-market-pulse" />
   </head>
   <body>
     <div class="shell">
@@ -16,9 +16,17 @@
         </div>
         <div class="history-panel">
           <div class="history-head">
-            <span>歷史資料</span>
-            <button id="refreshButton" type="button">重新整理</button>
+            <div>
+              <span>歷史快照</span>
+              <small id="historyMeta" class="history-meta">載入中</small>
+            </div>
+            <div class="history-actions">
+              <button id="historyLatestButton" type="button">最新</button>
+              <button id="refreshButton" type="button">更新</button>
+            </div>
           </div>
+          <label class="history-filter-label" for="historyMonthFilter">選擇月份</label>
+          <select id="historyMonthFilter" class="history-month-filter"></select>
           <nav id="historyList" class="history-list"></nav>
         </div>
       </aside>
@@ -55,6 +63,7 @@
         </section>
 
         <section id="dashboardView" class="view is-active">
+          <section id="marketPulse" class="market-pulse" hidden aria-label="Market Pulse 決策列"></section>
           <article id="strategyPanel" class="strategy-panel" hidden>
             <div class="strategy-top">
               <p class="strategy-kicker">Desk View</p>
@@ -63,11 +72,9 @@
                 <span id="strategyTone" class="strategy-tone">中性</span>
               </div>
             </div>
-            <div class="strategy-signals-caption">
-              <span class="strategy-caption-left">左：訊號原因</span>
-              <span class="strategy-caption-right">右：方向結論</span>
-            </div>
-            <h3 class="strategy-title">多空方向建議</h3>
+            <p class="strategy-read-order">先看結論與節奏，再以底下資料驗證。</p>
+            <div id="strategyDecision" class="strategy-decision"></div>
+            <h3 class="strategy-title">完整判讀</h3>
             <div id="strategyBody" class="strategy-body"></div>
           </article>
           <aside id="scPressurePanel" class="sc-pressure-panel" hidden></aside>
@@ -105,6 +112,6 @@
       </article>
     </template>
 
-    <script type="module" src="./app.js?v=20260910-retail-position-history"></script>
+    <script type="module" src="./app.js?v=20260915-market-pulse"></script>
   </body>
 </html>
