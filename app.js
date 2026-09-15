@@ -854,17 +854,65 @@ function renderStrategyBlocks(blocks, tone) {
     .map((block, index) => {
       const label = escapeHtml(block.label ?? "");
       const bodyHtml = stylizeStrategyBody(block.text, index === 0 ? tone : "neutral");
+      const evidenceLinks = deskEvidenceLinks[block.label] ?? [];
+      const linksHtml = evidenceLinks.length === 0
+        ? ""
+        : `
+          <div class="strategy-evidence-links" aria-label="${label} 對應資料卡">
+            ${evidenceLinks.map((link) => `
+              <button class="strategy-evidence-link" type="button" data-evidence-groups="${link.groups.join(" ")}">
+                <span>DATA</span>${escapeHtml(link.label)}
+              </button>
+            `).join("")}
+          </div>
+        `;
       return `
         <section class="strategy-block">
           <div class="strategy-block-head">${label}</div>
           <div class="strategy-block-body">
             <div class="strategy-bullet"></div>
-            <div class="strategy-block-text">${bodyHtml}</div>
+            <div class="strategy-block-text">${bodyHtml}${linksHtml}</div>
           </div>
         </section>
       `;
     })
     .join("");
+}
+
+const deskEvidenceLinks = {
+  "支持證據": [
+    { label: "外資期貨", groups: ["foreign-flow"] },
+    { label: "CALL／PUT", groups: ["foreign-call", "foreign-put"] },
+    { label: "散戶位階", groups: ["retail-long", "retail-short", "retail-net", "retail-micro"] },
+  ],
+  "反證風險": [
+    { label: "外資期貨", groups: ["foreign-flow"] },
+    { label: "CALL 壓力", groups: ["foreign-call"] },
+    { label: "散戶部位", groups: ["retail-long", "retail-short", "retail-net"] },
+  ],
+  "驗證重點": [
+    { label: "期貨續航", groups: ["foreign-flow"] },
+    { label: "SP／PUT", groups: ["foreign-put"] },
+    { label: "散戶降溫", groups: ["retail-long", "retail-short", "retail-net", "retail-micro"] },
+  ],
+};
+
+function bindDeskEvidenceLinks() {
+  els.strategyBody.querySelectorAll(".strategy-evidence-link").forEach((button) => {
+    button.addEventListener("click", () => {
+      const groups = nodeRelationGroups(button);
+      const target = [...document.querySelectorAll(".card[data-relation-groups]")]
+        .find((card) => nodeRelationGroups(card).some((group) => groups.includes(group)));
+      hideCardTooltip();
+      setRelationActivity(groups);
+      target?.classList.add("relation-jump");
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      window.setTimeout(() => {
+        document.querySelectorAll(".relation-jump").forEach((card) => card.classList.remove("relation-jump"));
+        document.querySelectorAll(".relation-active").forEach((card) => card.classList.remove("relation-active"));
+      }, 2200);
+    });
+  });
 }
 
 function mergeStrategyBlocks(baseBlocks, overrideBlocks) {
@@ -1624,6 +1672,7 @@ function renderStrategy(report, historyReports = []) {
     els.strategyDecision.appendChild(node);
   }
   els.strategyBody.innerHTML = renderStrategyBlocks(blocks.filter((block) => block.label !== "主命題"), strategy.tone);
+  bindDeskEvidenceLinks();
   return strategy;
 }
 
