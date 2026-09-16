@@ -461,6 +461,106 @@ body {
   white-space: nowrap;
 }
 
+.decision-focus {
+  position: sticky;
+  top: 10px;
+  z-index: 18;
+  display: grid;
+  grid-template-columns: 104px minmax(145px, 0.9fr) minmax(210px, 1.45fr) minmax(210px, 1.45fr) auto;
+  align-items: stretch;
+  gap: 0;
+  margin: 0 0 14px;
+  border: 1px solid rgba(255, 176, 0, 0.48);
+  border-left: 3px solid var(--accent);
+  border-radius: 2px;
+  background: rgba(4, 13, 22, 0.97);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+  font-family: var(--mono);
+  backdrop-filter: blur(12px);
+}
+
+.decision-focus.tone-bull { border-color: rgba(255, 91, 87, 0.54); border-left-color: var(--bull); }
+.decision-focus.tone-bear { border-color: rgba(47, 207, 122, 0.54); border-left-color: var(--bear); }
+.decision-focus.tone-risk { border-color: rgba(255, 45, 85, 0.58); border-left-color: var(--risk); }
+
+.decision-focus-identity,
+.decision-focus-item {
+  min-width: 0;
+  padding: 9px 11px;
+  border-right: 1px solid rgba(143, 163, 187, 0.17);
+}
+
+.decision-focus-identity {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  background: rgba(255, 176, 0, 0.06);
+}
+
+.decision-focus-identity span,
+.decision-focus-item > span {
+  display: block;
+  color: #8295aa;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+}
+
+.decision-focus-identity strong {
+  color: #f5f8fc;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.decision-focus-item {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+}
+
+.decision-focus-item strong,
+.decision-focus-item p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: #dbe5ef;
+  font-size: 10px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.decision-focus-thesis strong {
+  color: #ffe0a0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.decision-focus.tone-bull .decision-focus-thesis strong { color: #ffb7b2; }
+.decision-focus.tone-bear .decision-focus-thesis strong { color: #a8f0ca; }
+.decision-focus.tone-risk .decision-focus-thesis strong { color: #ffafc0; }
+
+.decision-focus-open {
+  align-self: stretch;
+  border: 0;
+  padding: 0 13px;
+  background: rgba(255, 176, 0, 0.1);
+  color: #ffd166;
+  cursor: pointer;
+  font: 800 9px var(--mono);
+  letter-spacing: 0.1em;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.decision-focus-open:hover,
+.decision-focus-open:focus-visible {
+  outline: none;
+  background: rgba(255, 176, 0, 0.24);
+  color: #fff4d5;
+}
+
 .trend-strip-panel {
   margin-bottom: 14px;
   border: 1px solid rgba(92, 191, 211, 0.3);
@@ -767,6 +867,53 @@ body {
   line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.strategy-details {
+  border: 1px solid rgba(143, 163, 187, 0.2);
+  background: rgba(1, 6, 12, 0.2);
+}
+
+.strategy-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  color: #b8c8da;
+  cursor: pointer;
+  font: 800 10px var(--mono);
+  letter-spacing: 0.08em;
+  list-style: none;
+}
+
+.strategy-details > summary::-webkit-details-marker { display: none; }
+
+.strategy-details > summary::before {
+  content: "+";
+  margin-right: 8px;
+  color: var(--accent-strong);
+  font-size: 14px;
+}
+
+.strategy-details > summary span { margin-right: auto; }
+
+.strategy-details > summary small {
+  color: #7e93aa;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+
+.strategy-details[open] > summary {
+  border-bottom: 1px solid rgba(143, 163, 187, 0.16);
+  background: rgba(255, 176, 0, 0.06);
+}
+
+.strategy-details[open] > summary::before { content: "−"; }
+.strategy-details[open] > summary small { color: #ffd166; }
+
+.strategy-details-content {
+  padding: 11px 12px 12px;
 }
 
 .strategy-kicker {
@@ -1970,6 +2117,14 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .decision-focus {
+    grid-template-columns: 104px minmax(160px, 1fr) minmax(190px, 1.5fr) auto;
+  }
+
+  .decision-focus-item:nth-of-type(4) {
+    display: none;
+  }
+
   .card-primary {
     grid-column: span 1;
   }
@@ -2050,6 +2205,26 @@ body {
   .market-pulse-grid,
   .strategy-decision {
     grid-template-columns: 1fr;
+  }
+
+  .decision-focus {
+    position: static;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 12px;
+  }
+
+  .decision-focus-identity,
+  .decision-focus-item {
+    border-bottom: 1px solid rgba(143, 163, 187, 0.17);
+  }
+
+  .decision-focus-item:nth-of-type(4) {
+    display: grid;
+  }
+
+  .decision-focus-open {
+    min-height: 38px;
+    grid-column: 1 / -1;
   }
 
   .trend-strip-panel {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>台股盤後籌碼儀表板</title>
-    <link rel="stylesheet" href="./styles.css?v=20260916-structure-guide" />
+    <link rel="stylesheet" href="./styles.css?v=20260916-decision-focus" />
   </head>
   <body>
     <div class="shell">
@@ -65,6 +65,7 @@
 
         <section id="dashboardView" class="view is-active">
           <section id="marketPulse" class="market-pulse" hidden aria-label="Market Pulse 決策列"></section>
+          <aside id="decisionFocus" class="decision-focus" hidden aria-label="當日決策焦點"></aside>
           <section id="trendStripPanel" class="trend-strip-panel" hidden aria-label="短線結構追蹤"></section>
           <article id="strategyPanel" class="strategy-panel" hidden>
             <div class="strategy-top">
@@ -76,8 +77,16 @@
             </div>
             <p class="strategy-read-order">先看結論與節奏，再以底下資料驗證。</p>
             <div id="strategyDecision" class="strategy-decision"></div>
-            <h3 class="strategy-title">完整判讀</h3>
-            <div id="strategyBody" class="strategy-body"></div>
+            <details id="strategyDetails" class="strategy-details">
+              <summary>
+                <span>完整判讀與證據</span>
+                <small>展開閱讀</small>
+              </summary>
+              <div class="strategy-details-content">
+                <h3 class="strategy-title">完整判讀</h3>
+                <div id="strategyBody" class="strategy-body"></div>
+              </div>
+            </details>
           </article>
           <aside id="scPressurePanel" class="sc-pressure-panel" hidden></aside>
           <aside id="optionContourPanel" class="option-contour-panel" hidden></aside>
@@ -132,6 +141,6 @@
       <p class="trend-tooltip-reading"></p>
     </aside>
 
-    <script type="module" src="./app.js?v=20260916-structure-guide"></script>
+    <script type="module" src="./app.js?v=20260916-decision-focus"></script>
   </body>
 </html>

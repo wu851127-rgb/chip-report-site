@@ -27,7 +27,9 @@ const els = {
   strategyTone: document.querySelector("#strategyTone"),
   strategyDecision: document.querySelector("#strategyDecision"),
   strategyBody: document.querySelector("#strategyBody"),
+  strategyDetails: document.querySelector("#strategyDetails"),
   marketPulse: document.querySelector("#marketPulse"),
+  decisionFocus: document.querySelector("#decisionFocus"),
   trendStripPanel: document.querySelector("#trendStripPanel"),
   scPressurePanel: document.querySelector("#scPressurePanel"),
   optionContourPanel: document.querySelector("#optionContourPanel"),
@@ -791,6 +793,61 @@ function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
     relationGroups: ["retail-long", "retail-short", "retail-net", "retail-micro"],
   }));
   panel.appendChild(grid);
+}
+
+function buildDecisionFocus(report, strategy) {
+  const blocks = new Map((strategy.blocks ?? []).map((block) => [block.label, block]));
+  const theme = strategy.flag || firstSentence(blocks.get("主命題")?.text, "盤勢結構判讀");
+  const action = firstSentence(blocks.get("部位節奏")?.text, "依結構分段處理");
+  const validation = firstSentence(blocks.get("驗證重點")?.text, "等待下一個驗證條件");
+  const panel = els.decisionFocus;
+  panel.replaceChildren();
+  panel.hidden = false;
+  panel.className = `decision-focus tone-${strategy.tone}`;
+
+  const identity = document.createElement("div");
+  identity.className = "decision-focus-identity";
+  const kicker = document.createElement("span");
+  kicker.textContent = "DECISION FOCUS";
+  const date = document.createElement("strong");
+  date.textContent = report.date;
+  identity.append(kicker, date);
+
+  const thesis = document.createElement("div");
+  thesis.className = "decision-focus-item decision-focus-thesis";
+  const thesisLabel = document.createElement("span");
+  thesisLabel.textContent = "當日結論";
+  const thesisValue = document.createElement("strong");
+  thesisValue.textContent = `${theme} · ${strategy.toneLabel}`;
+  thesis.append(thesisLabel, thesisValue);
+
+  const actionItem = document.createElement("div");
+  actionItem.className = "decision-focus-item";
+  const actionLabel = document.createElement("span");
+  actionLabel.textContent = "部位節奏";
+  const actionValue = document.createElement("p");
+  actionValue.textContent = action;
+  actionItem.append(actionLabel, actionValue);
+
+  const validationItem = document.createElement("div");
+  validationItem.className = "decision-focus-item";
+  const validationLabel = document.createElement("span");
+  validationLabel.textContent = "下一個驗證";
+  const validationValue = document.createElement("p");
+  validationValue.textContent = validation;
+  validationItem.append(validationLabel, validationValue);
+
+  const openDesk = document.createElement("button");
+  openDesk.type = "button";
+  openDesk.className = "decision-focus-open";
+  openDesk.textContent = "DESK VIEW";
+  openDesk.setAttribute("aria-label", "展開完整 Desk View 判讀");
+  openDesk.addEventListener("click", () => {
+    els.strategyDetails.open = true;
+    els.strategyPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  panel.append(identity, thesis, actionItem, validationItem, openDesk);
 }
 
 function average(values) {
@@ -1673,6 +1730,7 @@ function renderStrategy(report, historyReports = []) {
     node.append(label, value, note);
     els.strategyDecision.appendChild(node);
   }
+  els.strategyDetails.open = false;
   els.strategyBody.innerHTML = renderStrategyBlocks(blocks.filter((block) => block.label !== "主命題"), strategy.tone);
   bindDeskEvidenceLinks();
   return strategy;
@@ -2404,6 +2462,7 @@ async function loadReport(date, updateQuery = true) {
   const strategy = renderStrategy(report, historyReports);
   const optionContour = buildOptionContourSnapshot(historyReports);
   buildMarketPulse(report, strategy, optionContour, retailPosition);
+  buildDecisionFocus(report, strategy);
   const trendPanel = buildShortTrendPanel(historyReports);
   els.trendStripPanel.replaceChildren();
   els.trendStripPanel.hidden = !trendPanel;
