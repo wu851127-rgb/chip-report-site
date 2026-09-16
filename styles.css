@@ -624,6 +624,59 @@ body {
 .trend-call.is-relief .trend-strip-change { color: #a5f0c8; }
 .trend-put.is-stronger .trend-strip-change { color: #a8d8ff; }
 
+.trend-tooltip {
+  position: fixed;
+  z-index: 22;
+  width: min(330px, calc(100vw - 28px));
+  padding: 11px 12px 12px;
+  border: 1px solid rgba(103, 200, 218, 0.5);
+  border-left: 3px solid #67c8da;
+  background: rgba(4, 13, 23, 0.98);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+  color: var(--text);
+  font-family: var(--mono);
+  pointer-events: none;
+}
+
+.trend-tooltip[hidden] { display: none; }
+.trend-tooltip p { margin: 0; }
+
+.trend-tooltip-kicker {
+  color: #79ddeb;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.trend-tooltip-title {
+  margin-top: 5px !important;
+  color: #e5eef8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.trend-tooltip-value {
+  margin-top: 5px !important;
+  color: #ffe3a0;
+  font-size: 17px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-tooltip-formula,
+.trend-tooltip-reading {
+  margin-top: 8px !important;
+  color: #aebed0;
+  font-size: 9px;
+  line-height: 1.58;
+}
+
+.trend-tooltip-reading {
+  padding-top: 8px;
+  border-top: 1px solid rgba(143, 163, 187, 0.18);
+  color: #d0dce9;
+}
+
 
 .strategy-panel {
   margin-bottom: 14px;

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>台股盤後籌碼儀表板</title>
-    <link rel="stylesheet" href="./styles.css?v=20260915-crossday-trends" />
+    <link rel="stylesheet" href="./styles.css?v=20260916-structure-guide" />
   </head>
   <body>
     <div class="shell">
@@ -124,6 +124,14 @@
       <p class="card-tooltip-insight"></p>
     </aside>
 
-    <script type="module" src="./app.js?v=20260915-crossday-trends"></script>
+    <aside id="trendTooltip" class="trend-tooltip" role="tooltip" hidden>
+      <p class="trend-tooltip-kicker">STRUCTURE GUIDE</p>
+      <p class="trend-tooltip-title"></p>
+      <p class="trend-tooltip-value"></p>
+      <p class="trend-tooltip-formula"></p>
+      <p class="trend-tooltip-reading"></p>
+    </aside>
+
+    <script type="module" src="./app.js?v=20260916-structure-guide"></script>
   </body>
 </html>

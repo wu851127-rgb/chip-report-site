@@ -41,6 +41,7 @@ const els = {
   sectionTemplate: document.querySelector("#sectionTemplate"),
   cardTemplate: document.querySelector("#cardTemplate"),
   cardTooltip: document.querySelector("#cardTooltip"),
+  trendTooltip: document.querySelector("#trendTooltip"),
 };
 
 function countDecimalsFromFormat(numFmt) {
@@ -1796,6 +1797,36 @@ function hideCardTooltip() {
   document.querySelectorAll(".relation-active").forEach((node) => node.classList.remove("relation-active"));
 }
 
+function positionTrendTooltip(anchor) {
+  const tooltip = els.trendTooltip;
+  const margin = 14;
+  const offset = 14;
+  const rect = anchor.getBoundingClientRect();
+  const box = tooltip.getBoundingClientRect();
+  const preferRight = rect.right + offset + box.width <= window.innerWidth - margin;
+  const left = preferRight ? rect.right + offset : rect.left - box.width - offset;
+  const top = Math.min(Math.max(margin, rect.top), window.innerHeight - box.height - margin);
+  tooltip.style.left = `${Math.max(margin, left)}px`;
+  tooltip.style.top = `${top}px`;
+}
+
+function showTrendTooltip(row, definition, sample) {
+  const tooltip = els.trendTooltip;
+  const value = sample?.[definition.key];
+  tooltip.querySelector(".trend-tooltip-title").textContent = `${definition.label}｜${sample?.date ?? "—"}`;
+  tooltip.querySelector(".trend-tooltip-value").textContent = value === null || value === undefined
+    ? "數值暫無"
+    : `${renderValue(value, definition.numFmt)} ${definition.unit}`;
+  tooltip.querySelector(".trend-tooltip-formula").textContent = `計算：${definition.formula}`;
+  tooltip.querySelector(".trend-tooltip-reading").textContent = `研究框架：${definition.reading}`;
+  tooltip.hidden = false;
+  positionTrendTooltip(row);
+}
+
+function hideTrendTooltip() {
+  els.trendTooltip.hidden = true;
+}
+
 function bindCardInteraction(node, card, sectionTitle) {
   const groups = cardRelationGroups(card.label, sectionTitle);
   node.dataset.relationGroups = groups.join(" ");
@@ -1842,11 +1873,31 @@ function buildShortTrendPanel(historyReports) {
   if (rawSamples.length < 2) return null;
 
   const definitions = [
-    { key: "index", label: "加權指數", unit: "點", numFmt: "#,##0.00", tone: "market" },
-    { key: "futures", label: "外資期貨", unit: "口", numFmt: "#,##0", tone: "futures" },
-    { key: "callPressure", label: "CALL 壓力", unit: "仟元", numFmt: "#,##0", tone: "call" },
-    { key: "putDefense", label: "PUT 防守", unit: "仟元", numFmt: "#,##0", tone: "put" },
-    { key: "retailNet", label: "散戶淨部位", unit: "等值口", numFmt: "#,##0.0", tone: "retail" },
+    {
+      key: "index", label: "加權指數", unit: "點", numFmt: "#,##0.00", tone: "market",
+      formula: "TWSE MI_INDEX 收盤指數；5D 差額 = 當日收盤 - 五個交易日前收盤。",
+      reading: "價格是結構背景，不是單獨訊號。需與期貨、CALL／PUT 與散戶是否同向或背離一起看。",
+    },
+    {
+      key: "futures", label: "外資期貨", unit: "口", numFmt: "#,##0", tone: "futures",
+      formula: "外資 TXF 淨額 + MXF 淨額 / 4 + TMF 淨額 / 20，四捨五入為小台等值口數。",
+      reading: "下跌時若外資期貨逆勢回補且能延續，才提高低點測試權重；若與指數同向變化，優先視為整理訊號。",
+    },
+    {
+      key: "callPressure", label: "CALL 壓力", unit: "仟元", numFmt: "#,##0", tone: "call",
+      formula: "外資 SC 未平倉金額 - BC 未平倉金額；等於主表「外資(買)OP未平倉金額」的相反數。",
+      reading: "壓力連續收斂才表示上檔賣方壓力減輕。下跌日應看這個淨壓力，不將上漲日 SC 百分位硬套入判讀。",
+    },
+    {
+      key: "putDefense", label: "PUT 防守", unit: "仟元", numFmt: "#,##0", tone: "put",
+      formula: "外資 BP 未平倉金額 - SP 未平倉金額；即主表「外資(賣)OP未平倉金額」。",
+      reading: "防守提高代表 PUT 端結構轉強，但 SP 訊號只在下跌日、BP 與 SP 口數皆增加且 SP 增量大於 BP 時成立。",
+    },
+    {
+      key: "retailNet", label: "散戶淨部位", unit: "等值口", numFmt: "#,##0.0", tone: "retail",
+      formula: "(小台散戶看多 - 小台散戶看空) + (微台散戶看多 - 微台散戶看空) / 5。",
+      reading: "淨部位需搭配多空持倉占比與增減速度判讀：高多單或速度急升偏 FOMO，高空單而多單未擁擠則是懷疑型結構。",
+    },
   ].filter((definition) => rawSamples.filter((sample) => sample[definition.key] !== null).length >= 2);
   if (!definitions.length) return null;
 
@@ -1871,11 +1922,13 @@ function buildShortTrendPanel(historyReports) {
   panel.appendChild(rows);
 
   const refs = [];
+  let activeIndex = rawSamples.length - 1;
   const width = 210;
   const height = 32;
   const padding = 4;
   const formatChange = (value, numFmt) => `${value > 0 ? "+" : ""}${renderValue(value, numFmt)}`;
   const updateSelected = (selectedIndex) => {
+    activeIndex = selectedIndex;
     const sample = rawSamples[selectedIndex] ?? rawSamples.at(-1);
     selectedDate.textContent = `${sample.date}｜移動節點可交叉比對同一交易日`;
     refs.forEach((ref) => {
@@ -1898,6 +1951,7 @@ function buildShortTrendPanel(historyReports) {
         : delta > 0 ? "is-up" : delta < 0 ? "is-down" : "is-flat";
     const row = document.createElement("article");
     row.className = `trend-strip-row trend-${definition.tone} ${movementTone}`;
+    row.setAttribute("aria-label", `${definition.label}。移入可查看計算口徑與研究判讀。`);
     const label = document.createElement("div");
     label.className = "trend-strip-label";
     label.textContent = definition.label;
@@ -1947,9 +2001,18 @@ function buildShortTrendPanel(historyReports) {
       dot.setAttribute("tabindex", "0");
       dot.setAttribute("role", "button");
       dot.setAttribute("aria-label", `${rawSamples[index].date} ${definition.label} ${renderValue(item, definition.numFmt)}`);
-      dot.addEventListener("pointerenter", () => updateSelected(index));
-      dot.addEventListener("focus", () => updateSelected(index));
-      dot.addEventListener("click", () => updateSelected(index));
+      dot.addEventListener("pointerenter", () => {
+        updateSelected(index);
+        showTrendTooltip(row, definition, rawSamples[index]);
+      });
+      dot.addEventListener("focus", () => {
+        updateSelected(index);
+        showTrendTooltip(row, definition, rawSamples[index]);
+      });
+      dot.addEventListener("click", () => {
+        updateSelected(index);
+        showTrendTooltip(row, definition, rawSamples[index]);
+      });
       chart.appendChild(dot);
       dots[index] = dot;
     });
@@ -1962,6 +2025,15 @@ function buildShortTrendPanel(historyReports) {
     copy.className = "trend-strip-value-wrap";
     copy.append(value, unit);
     row.append(label, copy, chart, change);
+    row.addEventListener("pointerenter", () => showTrendTooltip(row, definition, rawSamples[activeIndex]));
+    row.addEventListener("pointermove", () => {
+      if (!els.trendTooltip.hidden) positionTrendTooltip(row);
+    });
+    row.addEventListener("pointerleave", hideTrendTooltip);
+    row.addEventListener("focusin", () => showTrendTooltip(row, definition, rawSamples[activeIndex]));
+    row.addEventListener("focusout", (event) => {
+      if (!row.contains(event.relatedTarget)) hideTrendTooltip();
+    });
     rows.appendChild(row);
     refs.push({ definition, value, dots });
   }
