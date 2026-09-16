@@ -580,6 +580,7 @@ function buildOptionContourMetric({ side, value, change, rank, formula }) {
   const isCall = side === "call";
   const item = document.createElement("article");
   item.className = `option-contour-metric ${isCall ? "is-call" : "is-put"}`;
+  item.dataset.relationGroups = isCall ? "foreign-call" : "foreign-put";
   item.title = formula;
 
   const head = document.createElement("div");
@@ -615,6 +616,7 @@ function buildOptionContourMetric({ side, value, change, rank, formula }) {
   track.appendChild(fill);
 
   item.append(head, total, unit, delta, track);
+  bindResearchRelationInteraction(item);
   return item;
 }
 
@@ -626,6 +628,7 @@ function renderOptionContourPanel(snapshot) {
     return;
   }
   panel.hidden = false;
+  panel.dataset.relationGroups = "foreign-call foreign-put";
 
   const head = document.createElement("div");
   head.className = "option-contour-head";
@@ -700,6 +703,7 @@ function buildPulseCell({ label, value, detail, tone = "neutral", signal = "", r
   const note = document.createElement("p");
   note.textContent = detail;
   item.append(head, primary, note);
+  bindResearchRelationInteraction(item);
   return item;
 }
 
@@ -725,7 +729,7 @@ function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
   title.textContent = "Market Pulse";
   const meta = document.createElement("p");
   meta.className = "market-pulse-meta";
-  meta.textContent = "先看四項關鍵結構；完整依據於下方 Desk View 與資料卡。";
+  meta.textContent = "先看四項關鍵結構；移入訊號可追蹤同一條研究脈絡。";
   head.append(title, meta);
   panel.appendChild(head);
 
@@ -914,6 +918,8 @@ function renderStrategyBlocks(blocks, tone) {
       const label = escapeHtml(block.label ?? "");
       const bodyHtml = stylizeStrategyBody(block.text, index === 0 ? tone : "neutral");
       const evidenceLinks = deskEvidenceLinks[block.label] ?? [];
+      const relationGroups = strategyBlockRelations[block.label] ?? evidenceLinks.flatMap((link) => link.groups);
+      const relationAttribute = relationGroups.length ? ` data-relation-groups="${relationGroups.join(" ")}"` : "";
       const linksHtml = evidenceLinks.length === 0
         ? ""
         : `
@@ -926,7 +932,7 @@ function renderStrategyBlocks(blocks, tone) {
           </div>
         `;
       return `
-        <section class="strategy-block">
+        <section class="strategy-block"${relationAttribute}>
           <div class="strategy-block-head">${label}</div>
           <div class="strategy-block-body">
             <div class="strategy-bullet"></div>
@@ -956,7 +962,16 @@ const deskEvidenceLinks = {
   ],
 };
 
+const strategyBlockRelations = {
+  "歷史定位": ["market-price", "foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short", "retail-net"],
+  "支持證據": ["foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short", "retail-net", "retail-micro"],
+  "反證風險": ["foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short", "retail-net"],
+  "部位節奏": ["market-price", "foreign-flow", "foreign-call", "foreign-put", "retail-net"],
+  "驗證重點": ["foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short", "retail-net", "retail-micro"],
+};
+
 function bindDeskEvidenceLinks() {
+  els.strategyBody.querySelectorAll(".strategy-block[data-relation-groups]").forEach(bindResearchRelationInteraction);
   els.strategyBody.querySelectorAll(".strategy-evidence-link").forEach((button) => {
     button.addEventListener("click", () => {
       const groups = nodeRelationGroups(button);
@@ -1731,6 +1746,8 @@ function renderStrategy(report, historyReports = []) {
     els.strategyDecision.appendChild(node);
   }
   els.strategyDetails.open = false;
+  els.strategyDetails.dataset.relationGroups = Object.values(strategyBlockRelations).flat().filter((group, index, groups) => groups.indexOf(group) === index).join(" ");
+  bindResearchRelationInteraction(els.strategyDetails);
   els.strategyBody.innerHTML = renderStrategyBlocks(blocks.filter((block) => block.label !== "主命題"), strategy.tone);
   bindDeskEvidenceLinks();
   return strategy;
@@ -1810,11 +1827,42 @@ function nodeRelationGroups(node) {
   return (node.dataset.relationGroups ?? "").split(" ").filter(Boolean);
 }
 
+const researchRelationPaths = {
+  "foreign-flow": ["foreign-flow", "foreign-call", "foreign-put"],
+  "foreign-call": ["foreign-call", "foreign-put", "foreign-flow"],
+  "foreign-put": ["foreign-put", "foreign-call", "foreign-flow"],
+  "retail-long": ["retail-long", "retail-short", "retail-net", "retail-micro"],
+  "retail-short": ["retail-short", "retail-long", "retail-net", "retail-micro"],
+  "retail-net": ["retail-net", "retail-long", "retail-short", "retail-micro"],
+  "retail-micro": ["retail-micro", "retail-long", "retail-short", "retail-net"],
+};
+
+function expandedResearchGroups(groups) {
+  return [...new Set(groups.flatMap((group) => researchRelationPaths[group] ?? [group]))];
+}
+
 function setRelationActivity(groups) {
-  const active = new Set(groups);
+  const active = new Set(expandedResearchGroups(groups));
   document.querySelectorAll("[data-relation-groups]").forEach((node) => {
     const isRelated = nodeRelationGroups(node).some((group) => active.has(group));
     node.classList.toggle("relation-active", isRelated);
+  });
+}
+
+function clearRelationActivity() {
+  document.querySelectorAll(".relation-active").forEach((node) => node.classList.remove("relation-active"));
+}
+
+function bindResearchRelationInteraction(node) {
+  const groups = nodeRelationGroups(node);
+  if (!groups.length || node.dataset.relationBound === "true") return;
+  node.dataset.relationBound = "true";
+  node.tabIndex = node.tabIndex >= 0 ? node.tabIndex : 0;
+  node.addEventListener("pointerenter", () => setRelationActivity(groups));
+  node.addEventListener("pointerleave", clearRelationActivity);
+  node.addEventListener("focusin", () => setRelationActivity(groups));
+  node.addEventListener("focusout", (event) => {
+    if (!node.contains(event.relatedTarget)) clearRelationActivity();
   });
 }
 
@@ -1933,26 +1981,31 @@ function buildShortTrendPanel(historyReports) {
   const definitions = [
     {
       key: "index", label: "加權指數", unit: "點", numFmt: "#,##0.00", tone: "market",
+      relationGroups: ["market-price"],
       formula: "TWSE MI_INDEX 收盤指數；5D 差額 = 當日收盤 - 五個交易日前收盤。",
       reading: "價格是結構背景，不是單獨訊號。需與期貨、CALL／PUT 與散戶是否同向或背離一起看。",
     },
     {
       key: "futures", label: "外資期貨", unit: "口", numFmt: "#,##0", tone: "futures",
+      relationGroups: ["foreign-flow"],
       formula: "外資 TXF 淨額 + MXF 淨額 / 4 + TMF 淨額 / 20，四捨五入為小台等值口數。",
       reading: "下跌時若外資期貨逆勢回補且能延續，才提高低點測試權重；若與指數同向變化，優先視為整理訊號。",
     },
     {
       key: "callPressure", label: "CALL 壓力", unit: "仟元", numFmt: "#,##0", tone: "call",
+      relationGroups: ["foreign-call"],
       formula: "外資 SC 未平倉金額 - BC 未平倉金額；等於主表「外資(買)OP未平倉金額」的相反數。",
       reading: "壓力連續收斂才表示上檔賣方壓力減輕。下跌日應看這個淨壓力，不將上漲日 SC 百分位硬套入判讀。",
     },
     {
       key: "putDefense", label: "PUT 防守", unit: "仟元", numFmt: "#,##0", tone: "put",
+      relationGroups: ["foreign-put"],
       formula: "外資 BP 未平倉金額 - SP 未平倉金額；即主表「外資(賣)OP未平倉金額」。",
       reading: "防守提高代表 PUT 端結構轉強，但 SP 訊號只在下跌日、BP 與 SP 口數皆增加且 SP 增量大於 BP 時成立。",
     },
     {
       key: "retailNet", label: "散戶淨部位", unit: "等值口", numFmt: "#,##0.0", tone: "retail",
+      relationGroups: ["retail-long", "retail-short", "retail-net", "retail-micro"],
       formula: "(小台散戶看多 - 小台散戶看空) + (微台散戶看多 - 微台散戶看空) / 5。",
       reading: "淨部位需搭配多空持倉占比與增減速度判讀：高多單或速度急升偏 FOMO，高空單而多單未擁擠則是懷疑型結構。",
     },
@@ -2009,6 +2062,7 @@ function buildShortTrendPanel(historyReports) {
         : delta > 0 ? "is-up" : delta < 0 ? "is-down" : "is-flat";
     const row = document.createElement("article");
     row.className = `trend-strip-row trend-${definition.tone} ${movementTone}`;
+    row.dataset.relationGroups = definition.relationGroups.join(" ");
     row.setAttribute("aria-label", `${definition.label}。移入可查看計算口徑與研究判讀。`);
     const label = document.createElement("div");
     label.className = "trend-strip-label";
@@ -2092,6 +2146,7 @@ function buildShortTrendPanel(historyReports) {
     row.addEventListener("focusout", (event) => {
       if (!row.contains(event.relatedTarget)) hideTrendTooltip();
     });
+    bindResearchRelationInteraction(row);
     rows.appendChild(row);
     refs.push({ definition, value, dots });
   }

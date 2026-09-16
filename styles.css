@@ -630,9 +630,15 @@ body {
   min-height: 45px;
   border-bottom: 1px solid rgba(143, 163, 187, 0.12);
   color: #6cc9db;
+  transition: background 130ms ease, box-shadow 130ms ease;
 }
 
 .trend-strip-row:last-child { border-bottom: 0; }
+
+.trend-strip-row.relation-active {
+  background: linear-gradient(90deg, rgba(255, 176, 0, 0.11), transparent 72%);
+  box-shadow: inset 2px 0 0 rgba(255, 209, 102, 0.75);
+}
 
 .trend-strip-label {
   color: #c0cedd;
@@ -872,6 +878,12 @@ body {
 .strategy-details {
   border: 1px solid rgba(143, 163, 187, 0.2);
   background: rgba(1, 6, 12, 0.2);
+  transition: border-color 130ms ease, box-shadow 130ms ease;
+}
+
+.strategy-details.relation-active {
+  border-color: rgba(255, 176, 0, 0.52);
+  box-shadow: inset 2px 0 0 rgba(255, 209, 102, 0.72);
 }
 
 .strategy-details > summary {
@@ -1045,6 +1057,13 @@ body {
   background: rgba(255, 255, 255, 0.02);
   border-radius: 2px;
   overflow: hidden;
+  transition: border-color 130ms ease, background 130ms ease, box-shadow 130ms ease;
+}
+
+.strategy-block.relation-active {
+  border-color: rgba(255, 176, 0, 0.5);
+  background: linear-gradient(90deg, rgba(255, 176, 0, 0.09), rgba(255, 255, 255, 0.02) 55%);
+  box-shadow: inset 2px 0 0 rgba(255, 209, 102, 0.72);
 }
 
 .strategy-block-head {
@@ -1706,6 +1725,11 @@ body {
   font-family: var(--mono);
 }
 
+.option-contour-panel.relation-active {
+  border-color: rgba(255, 176, 0, 0.62);
+  box-shadow: inset 2px 0 0 rgba(255, 209, 102, 0.72), 0 0 22px rgba(255, 176, 0, 0.06);
+}
+
 .option-contour-head,
 .option-contour-metric-head {
   display: flex;
@@ -1760,6 +1784,13 @@ body {
   border-left: 3px solid var(--neutral);
   padding: 10px 11px;
   background: rgba(1, 6, 12, 0.38);
+  transition: border-color 130ms ease, background 130ms ease, box-shadow 130ms ease;
+}
+
+.option-contour-metric.relation-active {
+  border-color: rgba(255, 209, 102, 0.54);
+  background: linear-gradient(90deg, rgba(255, 176, 0, 0.12), rgba(1, 6, 12, 0.38) 74%);
+  box-shadow: inset 2px 0 0 rgba(255, 209, 102, 0.66);
 }
 
 .option-contour-metric.is-call { border-left-color: #ff7652; }
