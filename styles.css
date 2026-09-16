@@ -461,6 +461,170 @@ body {
   white-space: nowrap;
 }
 
+.trend-strip-panel {
+  margin-bottom: 14px;
+  border: 1px solid rgba(92, 191, 211, 0.3);
+  border-left: 3px solid #67c8da;
+  border-radius: 2px;
+  padding: 11px 14px 12px;
+  background:
+    linear-gradient(90deg, rgba(83, 198, 217, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(10, 25, 38, 0.98), rgba(5, 12, 20, 0.98));
+  font-family: var(--mono);
+}
+
+.trend-strip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trend-strip-head > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.trend-strip-head span {
+  color: #75d9e6;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.trend-strip-head strong {
+  color: var(--text);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.trend-strip-date,
+.trend-strip-legend {
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.trend-strip-date {
+  color: #b7c7d9;
+  text-align: right;
+}
+
+.trend-strip-legend {
+  margin-top: 5px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(143, 163, 187, 0.16);
+}
+
+.trend-strip-rows {
+  display: grid;
+}
+
+.trend-strip-row {
+  display: grid;
+  grid-template-columns: 92px minmax(92px, 0.8fr) minmax(145px, 1.7fr) 88px;
+  align-items: center;
+  gap: 10px;
+  min-height: 45px;
+  border-bottom: 1px solid rgba(143, 163, 187, 0.12);
+  color: #6cc9db;
+}
+
+.trend-strip-row:last-child { border-bottom: 0; }
+
+.trend-strip-label {
+  color: #c0cedd;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.trend-strip-value-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.trend-strip-value {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trend-strip-value-wrap small {
+  color: #71869b;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.trend-strip-chart {
+  display: block;
+  width: 100%;
+  height: 32px;
+  overflow: visible;
+}
+
+.trend-strip-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.55;
+  vector-effect: non-scaling-stroke;
+}
+
+.trend-strip-baseline {
+  stroke: rgba(143, 163, 187, 0.3);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.trend-strip-dot {
+  fill: currentColor;
+  cursor: crosshair;
+  opacity: 0.38;
+  transition: opacity 110ms ease, r 110ms ease, filter 110ms ease;
+}
+
+.trend-strip-dot:hover,
+.trend-strip-dot:focus-visible,
+.trend-strip-dot.is-selected {
+  outline: none;
+  opacity: 1;
+  filter: brightness(1.45);
+}
+
+.trend-strip-dot:focus-visible {
+  stroke: #fff0b0;
+  stroke-width: 1.2;
+}
+
+.trend-strip-change {
+  color: #aebdce;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.trend-market.is-up { color: #ff776f; }
+.trend-market.is-down { color: #59d39a; }
+.trend-futures { color: #e8bd65; }
+.trend-call.is-pressure { color: #ff7770; }
+.trend-call.is-relief { color: #5cd6a0; }
+.trend-put.is-stronger { color: #71bff0; }
+.trend-put.is-weaker { color: #7c8fa5; }
+.trend-retail { color: #b992eb; }
+.trend-call.is-pressure .trend-strip-change { color: #ffb0aa; }
+.trend-call.is-relief .trend-strip-change { color: #a5f0c8; }
+.trend-put.is-stronger .trend-strip-change { color: #a8d8ff; }
+
+
 .strategy-panel {
   margin-bottom: 14px;
   border: 1px solid var(--line-strong);
@@ -1495,10 +1659,6 @@ body {
   transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
-.card-has-sparkline {
-  min-height: 166px;
-}
-
 .card::before {
   content: "";
   position: absolute;
@@ -1599,82 +1759,6 @@ body {
   transform-origin: left center;
   transition: transform 140ms ease, text-shadow 140ms ease;
 }
-
-.card-sparkline {
-  margin: 1px 0 8px;
-  padding: 5px 6px 3px;
-  border-top: 1px solid rgba(143, 163, 187, 0.17);
-  background: rgba(3, 10, 17, 0.3);
-  color: #7fc8d9;
-  font-family: var(--mono);
-}
-
-.card-sparkline-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-  min-height: 11px;
-  color: #73879b;
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-}
-
-.card-sparkline-head strong {
-  overflow: hidden;
-  color: #b7c6d6;
-  font-size: 8px;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.card-sparkline-chart {
-  display: block;
-  width: 100%;
-  height: 31px;
-  margin-top: 2px;
-  overflow: visible;
-}
-
-.card-sparkline-line {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.55;
-  vector-effect: non-scaling-stroke;
-}
-
-.card-sparkline-baseline {
-  stroke: rgba(143, 163, 187, 0.32);
-  stroke-width: 1;
-  stroke-dasharray: 2 3;
-  vector-effect: non-scaling-stroke;
-}
-
-.card-sparkline-dot {
-  fill: currentColor;
-  opacity: 0.5;
-  cursor: crosshair;
-  transition: opacity 100ms ease, r 100ms ease;
-}
-
-.card-sparkline-dot:hover,
-.card-sparkline-dot:focus-visible,
-.card-sparkline-dot.is-latest {
-  outline: none;
-  opacity: 1;
-}
-
-.card-sparkline-dot:focus-visible {
-  stroke: #fff0b0;
-  stroke-width: 1.3;
-}
-
-.card-sparkline-bull { color: #ff746f; }
-.card-sparkline-bear { color: #5bd79d; }
-.card-sparkline-neutral { color: #76cbdc; }
 
 .card:hover {
   z-index: 2;
@@ -1913,6 +1997,44 @@ body {
   .market-pulse-grid,
   .strategy-decision {
     grid-template-columns: 1fr;
+  }
+
+  .trend-strip-panel {
+    padding: 10px 11px;
+  }
+
+  .trend-strip-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .trend-strip-date {
+    text-align: left;
+  }
+
+  .trend-strip-row {
+    grid-template-columns: 80px minmax(0, 1fr) 70px;
+    gap: 7px;
+    min-height: 49px;
+  }
+
+  .trend-strip-value-wrap {
+    grid-column: 2 / 4;
+    grid-row: 1;
+    justify-content: flex-end;
+  }
+
+  .trend-strip-chart {
+    grid-column: 2 / 4;
+    grid-row: 2;
+  }
+
+  .trend-strip-change {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 9px;
+    text-align: left;
   }
 
   .strategy-decision-item strong {

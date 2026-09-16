@@ -28,6 +28,7 @@ const els = {
   strategyDecision: document.querySelector("#strategyDecision"),
   strategyBody: document.querySelector("#strategyBody"),
   marketPulse: document.querySelector("#marketPulse"),
+  trendStripPanel: document.querySelector("#trendStripPanel"),
   scPressurePanel: document.querySelector("#scPressurePanel"),
   optionContourPanel: document.querySelector("#optionContourPanel"),
   downloadLink: document.querySelector("#downloadLink"),
@@ -157,29 +158,6 @@ function collectAllCardsFromReport(report) {
 function getReportCardValue(report, label, { detail = false } = {}) {
   const cards = detail ? collectAllCardsFromReport(report) : collectCardsFromReport(report);
   return getCardValue(cards, label);
-}
-
-function getSectionCardValue(report, sectionTitle, label) {
-  for (const view of [report?.dashboard, report?.detail]) {
-    for (const section of view?.sections ?? []) {
-      if (section.title !== sectionTitle) continue;
-      const card = (section.cards ?? []).find((item) => item.label === label);
-      if (card) return numericValue(card.value);
-    }
-  }
-  return null;
-}
-
-function buildCardTrend(historyReports, sectionTitle, card, limit = 7) {
-  const samples = historyReports
-    .slice(0, limit)
-    .map((report) => ({
-      date: report?.date ?? "",
-      value: getSectionCardValue(report, sectionTitle, card.label),
-    }))
-    .filter((sample) => sample.date && sample.value !== null)
-    .reverse();
-  return samples.length >= 2 ? samples : [];
 }
 
 function buildRetailPositionFromHistory(historyReports) {
@@ -1843,87 +1821,155 @@ function bindCardInteraction(node, card, sectionTitle) {
   });
 }
 
-function buildCardSparkline(card, samples) {
-  if (samples.length < 2) return null;
-  const width = 124;
-  const height = 31;
-  const padding = 3;
-  const values = samples.map((sample) => sample.value);
-  let low = Math.min(...values);
-  let high = Math.max(...values);
-  if (low === high) {
-    const allowance = Math.abs(low || 1) * 0.08;
-    low -= allowance;
-    high += allowance;
-  }
-  const xAt = (index) => padding + (index / (samples.length - 1)) * (width - padding * 2);
-  const yAt = (value) => height - padding - ((value - low) / (high - low)) * (height - padding * 2);
-  const points = samples.map((sample, index) => ({ ...sample, x: xAt(index), y: yAt(sample.value) }));
-  const latest = points.at(-1);
-  const first = points[0];
-  const movement = latest.value - first.value;
-  const directional = isDirectionalCard(card.label);
-  const tone = directional ? (movement > 0 ? "bull" : movement < 0 ? "bear" : "neutral") : "neutral";
-  const shell = document.createElement("div");
-  shell.className = `card-sparkline card-sparkline-${tone}`;
-  shell.setAttribute("aria-label", `${card.label}近 ${samples.length} 個交易日變化`);
+function buildShortTrendPanel(historyReports) {
+  const rawSamples = historyReports.slice(0, 5).reverse().map((report) => {
+    const retailNet = getReportCardValue(report, "小台+微台等值淨多空")
+      ?? (() => {
+        const small = getReportCardValue(report, "散戶未平倉");
+        const micro = getReportCardValue(report, "微台散戶未平倉");
+        return small === null || micro === null ? null : small + micro / 5;
+      })();
+    const callNet = getReportCardValue(report, "外資(買)OP未平倉金額");
+    return {
+      date: report?.date ?? "",
+      index: getReportCardValue(report, "加權指數"),
+      futures: getReportCardValue(report, "外資(大小台)期貨未平倉"),
+      callPressure: callNet === null ? null : -callNet,
+      putDefense: getReportCardValue(report, "外資(賣)OP未平倉金額"),
+      retailNet,
+    };
+  }).filter((sample) => sample.date);
+  if (rawSamples.length < 2) return null;
 
+  const definitions = [
+    { key: "index", label: "加權指數", unit: "點", numFmt: "#,##0.00", tone: "market" },
+    { key: "futures", label: "外資期貨", unit: "口", numFmt: "#,##0", tone: "futures" },
+    { key: "callPressure", label: "CALL 壓力", unit: "仟元", numFmt: "#,##0", tone: "call" },
+    { key: "putDefense", label: "PUT 防守", unit: "仟元", numFmt: "#,##0", tone: "put" },
+    { key: "retailNet", label: "散戶淨部位", unit: "等值口", numFmt: "#,##0.0", tone: "retail" },
+  ].filter((definition) => rawSamples.filter((sample) => sample[definition.key] !== null).length >= 2);
+  if (!definitions.length) return null;
+
+  const panel = document.createElement("section");
+  panel.className = "trend-strip-panel";
+  panel.setAttribute("aria-label", "短線結構追蹤");
   const head = document.createElement("div");
-  head.className = "card-sparkline-head";
-  const label = document.createElement("span");
-  label.textContent = `${samples.length}D TREND`;
-  const detail = document.createElement("strong");
-  const updateDetail = (sample) => {
-    detail.textContent = `${sample.date.slice(5).replace("-", "/")}  ${renderValue(sample.value, card.numFmt ?? "")}`;
-  };
-  updateDetail(latest);
-  head.append(label, detail);
+  head.className = "trend-strip-head";
+  const title = document.createElement("div");
+  title.innerHTML = "<span>STRUCTURE TRACE</span><strong>短線結構追蹤</strong>";
+  const selectedDate = document.createElement("p");
+  selectedDate.className = "trend-strip-date";
+  head.append(title, selectedDate);
+  panel.appendChild(head);
 
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "card-sparkline-chart");
-  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", `${card.label}：${samples.map((sample) => `${sample.date} ${renderValue(sample.value, card.numFmt ?? "")}`).join("；")}`);
-  const zeroY = low <= 0 && high >= 0 ? yAt(0) : null;
-  if (zeroY !== null) {
-    const baseline = document.createElementNS(svg.namespaceURI, "line");
-    baseline.setAttribute("class", "card-sparkline-baseline");
-    baseline.setAttribute("x1", "0");
-    baseline.setAttribute("x2", String(width));
-    baseline.setAttribute("y1", String(zeroY));
-    baseline.setAttribute("y2", String(zeroY));
-    svg.appendChild(baseline);
-  }
-  const path = document.createElementNS(svg.namespaceURI, "path");
-  path.setAttribute("class", "card-sparkline-line");
-  path.setAttribute("d", points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" "));
-  svg.appendChild(path);
-  for (const point of points) {
-    const dot = document.createElementNS(svg.namespaceURI, "circle");
-    dot.setAttribute("class", `card-sparkline-dot${point === latest ? " is-latest" : ""}`);
-    dot.setAttribute("cx", String(point.x));
-    dot.setAttribute("cy", String(point.y));
-    dot.setAttribute("r", point === latest ? "2.7" : "1.35");
-    dot.setAttribute("tabindex", "0");
-    dot.setAttribute("role", "button");
-    dot.setAttribute("aria-label", `${point.date}：${renderValue(point.value, card.numFmt ?? "")}`);
-    dot.addEventListener("pointerenter", (event) => {
-      event.stopPropagation();
-      updateDetail(point);
+  const legend = document.createElement("p");
+  legend.className = "trend-strip-legend";
+  legend.textContent = "最近 5 個交易日，共用日期索引；各列以自身數值縮放，請比較方向與背離，不比較線高。";
+  panel.appendChild(legend);
+  const rows = document.createElement("div");
+  rows.className = "trend-strip-rows";
+  panel.appendChild(rows);
+
+  const refs = [];
+  const width = 210;
+  const height = 32;
+  const padding = 4;
+  const formatChange = (value, numFmt) => `${value > 0 ? "+" : ""}${renderValue(value, numFmt)}`;
+  const updateSelected = (selectedIndex) => {
+    const sample = rawSamples[selectedIndex] ?? rawSamples.at(-1);
+    selectedDate.textContent = `${sample.date}｜移動節點可交叉比對同一交易日`;
+    refs.forEach((ref) => {
+      const value = sample[ref.definition.key];
+      ref.value.textContent = value === null ? "—" : renderValue(value, ref.definition.numFmt);
+      ref.dots.forEach((dot, index) => dot.classList.toggle("is-selected", index === selectedIndex));
     });
-    dot.addEventListener("focus", () => updateDetail(point));
-    dot.addEventListener("click", (event) => {
-      event.stopPropagation();
-      updateDetail(point);
+  };
+
+  for (const definition of definitions) {
+    const values = rawSamples.map((sample) => sample[definition.key]);
+    const numeric = values.filter((value) => value !== null);
+    const first = numeric[0];
+    const latest = numeric.at(-1);
+    const delta = latest - first;
+    const movementTone = definition.tone === "call"
+      ? (delta > 0 ? "is-pressure" : "is-relief")
+      : definition.tone === "put"
+        ? (delta > 0 ? "is-stronger" : "is-weaker")
+        : delta > 0 ? "is-up" : delta < 0 ? "is-down" : "is-flat";
+    const row = document.createElement("article");
+    row.className = `trend-strip-row trend-${definition.tone} ${movementTone}`;
+    const label = document.createElement("div");
+    label.className = "trend-strip-label";
+    label.textContent = definition.label;
+    const value = document.createElement("strong");
+    value.className = "trend-strip-value";
+    const chart = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    chart.setAttribute("class", "trend-strip-chart");
+    chart.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    chart.setAttribute("role", "img");
+    chart.setAttribute("aria-label", `${definition.label}近五日走勢`);
+    let low = Math.min(...numeric);
+    let high = Math.max(...numeric);
+    if (low === high) {
+      const allowance = Math.abs(low || 1) * 0.08;
+      low -= allowance;
+      high += allowance;
+    }
+    const xAt = (index) => padding + (index / (rawSamples.length - 1)) * (width - padding * 2);
+    const yAt = (item) => height - padding - ((item - low) / (high - low)) * (height - padding * 2);
+    const zeroY = low <= 0 && high >= 0 ? yAt(0) : null;
+    if (zeroY !== null) {
+      const baseline = document.createElementNS(chart.namespaceURI, "line");
+      baseline.setAttribute("class", "trend-strip-baseline");
+      baseline.setAttribute("x1", "0");
+      baseline.setAttribute("x2", String(width));
+      baseline.setAttribute("y1", String(zeroY));
+      baseline.setAttribute("y2", String(zeroY));
+      chart.appendChild(baseline);
+    }
+    let pathData = "";
+    values.forEach((item, index) => {
+      if (item === null) return;
+      pathData += `${pathData ? " L" : "M"}${xAt(index).toFixed(2)} ${yAt(item).toFixed(2)}`;
     });
-    svg.appendChild(dot);
+    const path = document.createElementNS(chart.namespaceURI, "path");
+    path.setAttribute("class", "trend-strip-line");
+    path.setAttribute("d", pathData);
+    chart.appendChild(path);
+    const dots = [];
+    values.forEach((item, index) => {
+      if (item === null) return;
+      const dot = document.createElementNS(chart.namespaceURI, "circle");
+      dot.setAttribute("class", "trend-strip-dot");
+      dot.setAttribute("cx", String(xAt(index)));
+      dot.setAttribute("cy", String(yAt(item)));
+      dot.setAttribute("r", "2.5");
+      dot.setAttribute("tabindex", "0");
+      dot.setAttribute("role", "button");
+      dot.setAttribute("aria-label", `${rawSamples[index].date} ${definition.label} ${renderValue(item, definition.numFmt)}`);
+      dot.addEventListener("pointerenter", () => updateSelected(index));
+      dot.addEventListener("focus", () => updateSelected(index));
+      dot.addEventListener("click", () => updateSelected(index));
+      chart.appendChild(dot);
+      dots[index] = dot;
+    });
+    const change = document.createElement("span");
+    change.className = "trend-strip-change";
+    change.textContent = `5D ${formatChange(delta, definition.numFmt)}`;
+    const unit = document.createElement("small");
+    unit.textContent = definition.unit;
+    const copy = document.createElement("div");
+    copy.className = "trend-strip-value-wrap";
+    copy.append(value, unit);
+    row.append(label, copy, chart, change);
+    rows.appendChild(row);
+    refs.push({ definition, value, dots });
   }
-  svg.addEventListener("pointerleave", () => updateDetail(latest));
-  shell.append(head, svg);
-  return shell;
+  updateSelected(rawSamples.length - 1);
+  return panel;
 }
 
-function buildCard(card, sectionTitle = "", historyReports = []) {
+function buildCard(card, sectionTitle = "") {
   const node = els.cardTemplate.content.firstElementChild.cloneNode(true);
   if (card.alert) node.classList.add("card-alert");
   const numeric = numericValue(card.value);
@@ -1949,11 +1995,6 @@ function buildCard(card, sectionTitle = "", historyReports = []) {
   node.querySelector(".card-label").textContent = card.label ?? "";
   node.querySelector(".card-value").textContent = renderValue(card.value, card.numFmt ?? "");
   node.querySelector(".card-note").textContent = card.note ?? "";
-  const sparkline = buildCardSparkline(card, buildCardTrend(historyReports, sectionTitle, card));
-  if (sparkline) {
-    node.classList.add("card-has-sparkline");
-    node.querySelector(".card-note").before(sparkline);
-  }
   bindCardInteraction(node, card, sectionTitle);
   return node;
 }
@@ -2128,7 +2169,7 @@ function buildRetailPositionPanel(position) {
   return panel;
 }
 
-function buildSection(section, historyReports = []) {
+function buildSection(section) {
   const node = els.sectionTemplate.content.firstElementChild.cloneNode(true);
   node.classList.add(`section-${String(section.title ?? "").replaceAll(/[^a-zA-Z0-9]/g, "") || "data"}`);
   node.querySelector("h3").textContent = section.title ?? "";
@@ -2137,15 +2178,15 @@ function buildSection(section, historyReports = []) {
   const retailPanel = buildRetailPositionPanel(section.retailPosition);
   if (retailPanel) grid.before(retailPanel);
   for (const card of section.cards ?? []) {
-    grid.appendChild(buildCard(card, section.title ?? "", historyReports));
+    grid.appendChild(buildCard(card, section.title ?? ""));
   }
   return node;
 }
 
-function renderSections(container, sections, historyReports = []) {
+function renderSections(container, sections) {
   container.replaceChildren();
   for (const section of sections ?? []) {
-    container.appendChild(buildSection(section, historyReports));
+    container.appendChild(buildSection(section));
   }
 }
 
@@ -2291,10 +2332,14 @@ async function loadReport(date, updateQuery = true) {
   const strategy = renderStrategy(report, historyReports);
   const optionContour = buildOptionContourSnapshot(historyReports);
   buildMarketPulse(report, strategy, optionContour, retailPosition);
+  const trendPanel = buildShortTrendPanel(historyReports);
+  els.trendStripPanel.replaceChildren();
+  els.trendStripPanel.hidden = !trendPanel;
+  if (trendPanel) els.trendStripPanel.appendChild(trendPanel);
   renderScPressurePanel(buildScPressureSnapshot(historyReports));
   renderOptionContourPanel(optionContour);
-  renderSections(els.dashboardSections, dashboardSections, historyReports);
-  renderSections(els.detailSections, report.detail.sections, historyReports);
+  renderSections(els.dashboardSections, dashboardSections);
+  renderSections(els.detailSections, report.detail.sections);
   renderStatus(state.index, state.currentDate);
   renderHistory(state.index);
 }
