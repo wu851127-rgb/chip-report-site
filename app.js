@@ -2509,7 +2509,7 @@ async function loadReport(date, updateQuery = true) {
     window.history.replaceState({}, "", url);
   }
 
-  els.heroTitle.textContent = report.dashboard.title ?? date;
+  renderHeroTitle(report.dashboard.title ?? date);
   els.heroSubtitle.textContent = report.dashboard.subtitle ?? "";
   els.dashboardSummary.textContent = report.dashboard.summary ?? "";
   els.downloadLink.href = report.xlsxHref ?? "#";
@@ -2528,6 +2528,26 @@ async function loadReport(date, updateQuery = true) {
   renderSections(els.detailSections, report.detail.sections);
   renderStatus(state.index, state.currentDate);
   renderHistory(state.index);
+}
+
+function renderHeroTitle(title) {
+  const normalizedTitle = String(title ?? "");
+  const dateMatch = normalizedTitle.match(/^(.*?)(\d{4}-\d{2}-\d{2})$/);
+
+  if (!dateMatch) {
+    els.heroTitle.textContent = normalizedTitle;
+    return;
+  }
+
+  const titleText = document.createElement("span");
+  titleText.className = "hero-title-text";
+  titleText.textContent = dateMatch[1].trim();
+
+  const dateText = document.createElement("span");
+  dateText.className = "hero-title-date";
+  dateText.textContent = dateMatch[2];
+
+  els.heroTitle.replaceChildren(titleText, document.createTextNode(" "), dateText);
 }
 
 function bindTabs() {
