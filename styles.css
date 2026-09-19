@@ -200,9 +200,9 @@ body {
   padding: 7px 9px;
   cursor: pointer;
   text-align: left;
-  display: flex;
+  display: grid;
+  grid-template-columns: 48px auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
 }
 
@@ -219,7 +219,37 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.history-state-rail {
+  display: grid;
+  grid-template-columns: repeat(4, 3px);
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+  padding: 1px 0;
+}
+
+.history-state-marker {
+  width: 3px;
+  height: 12px;
+  border-radius: 1px;
+  background: #506276;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.history-state-marker.is-bull { background: var(--bull); }
+.history-state-marker.is-bear { background: var(--bear); }
+.history-state-marker.is-risk { background: var(--risk); }
+
+.history-item:hover .history-state-marker,
+.history-item.is-active .history-state-marker {
+  filter: brightness(1.2);
+  transform: scaleY(1.15);
+}
+
 .history-item-copy {
+  min-width: 0;
+  justify-self: end;
   color: var(--muted);
   font: 500 9px var(--mono);
   letter-spacing: 0.04em;

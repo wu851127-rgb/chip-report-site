@@ -2384,6 +2384,78 @@ function monthLabel(month) {
   return year && value ? `${year} 年 ${value} 月` : month;
 }
 
+function buildHistorySignalState(report, previousReport) {
+  if (!report) {
+    return [
+      { key: "market", tone: "neutral", label: "大盤資料載入中" },
+      { key: "futures", tone: "neutral", label: "期貨資料載入中" },
+      { key: "options", tone: "neutral", label: "選擇權資料載入中" },
+      { key: "retail", tone: "neutral", label: "散戶資料載入中" },
+    ];
+  }
+
+  const indexChange = getReportCardValue(report, "加權指數漲跌");
+  const futuresChange = getReportCardValue(report, "外資期貨未平倉與前日增減");
+  const foreignBuy = getReportCardValue(report, "外資(買)OP未平倉金額");
+  const foreignSell = getReportCardValue(report, "外資(賣)OP未平倉金額");
+  const previousBuy = getReportCardValue(previousReport, "外資(買)OP未平倉金額");
+  const previousSell = getReportCardValue(previousReport, "外資(賣)OP未平倉金額");
+  const retailLongRank = getReportCardValue(report, "散戶多單持倉占比位階(45日)");
+  const retailShortRank = getReportCardValue(report, "散戶空單持倉占比位階(45日)");
+
+  const optionStatus = { key: "options", tone: "neutral", label: "選擇權輪廓：等待前日交叉資料" };
+  if ([foreignBuy, foreignSell, previousBuy, previousSell].every((value) => value !== null)) {
+    const callPressureDelta = (-foreignBuy) - (-previousBuy);
+    const putDefenseDelta = foreignSell - previousSell;
+    if (callPressureDelta > 0 && putDefenseDelta < 0) {
+      optionStatus.tone = "risk";
+      optionStatus.label = "選擇權輪廓：CALL 壓力升高、PUT 防守減弱";
+    } else if (callPressureDelta < 0 && putDefenseDelta > 0) {
+      optionStatus.tone = "bull";
+      optionStatus.label = "選擇權輪廓：CALL 壓力舒緩、PUT 防守增強";
+    } else {
+      optionStatus.label = "選擇權輪廓：雙端訊號未同步";
+    }
+  }
+
+  // Keep the rail aligned with the dashboard's crowding rule: high retail long
+  // exposure is the chase-risk condition, while high short exposure is contextual.
+  const retailExtreme = retailLongRank !== null && retailLongRank >= 80;
+  return [
+    {
+      key: "market",
+      tone: determineFlowTone(indexChange),
+      label: indexChange === null ? "大盤資料不足" : `大盤動能：${indexChange >= 0 ? "收紅" : "收黑"}`,
+    },
+    {
+      key: "futures",
+      tone: determineFlowTone(futuresChange),
+      label: futuresChange === null ? "外資期貨資料不足" : `外資期貨：${futuresChange >= 0 ? "多單增加／空單回補" : "多單減少／空單增加"}`,
+    },
+    optionStatus,
+    {
+      key: "retail",
+      tone: retailExtreme ? "risk" : "neutral",
+      label: retailExtreme ? "散戶位階：多方持倉占比進入高位擁擠區" : "散戶位階：未見多方持倉占比極端擁擠",
+    },
+  ];
+}
+
+function buildHistoryStateRail(report, previousReport) {
+  const rail = document.createElement("span");
+  rail.className = "history-state-rail";
+  rail.setAttribute("aria-hidden", "true");
+
+  for (const signal of buildHistorySignalState(report, previousReport)) {
+    const marker = document.createElement("span");
+    marker.className = `history-state-marker is-${signal.tone}`;
+    marker.dataset.signal = signal.key;
+    marker.title = signal.label;
+    rail.appendChild(marker);
+  }
+  return rail;
+}
+
 function renderHistory(index) {
   const reports = index.reports ?? [];
   const months = [...new Set(reports.map((report) => dateMonth(report.date)).filter(Boolean))];
@@ -2405,10 +2477,15 @@ function renderHistory(index) {
   els.historyMeta.textContent = `${monthLabel(state.historyMonth)} · ${visibleReports.length} 筆`;
   els.historyList.replaceChildren();
   for (const report of visibleReports) {
+    const reportIndex = reports.findIndex((item) => item.date === report.date);
+    const snapshot = state.reportCache.get(report.date);
+    const previousSnapshot = reportIndex >= 0 ? state.reportCache.get(reports[reportIndex + 1]?.date) : null;
+    const signals = buildHistorySignalState(snapshot, previousSnapshot);
     const button = document.createElement("button");
     button.type = "button";
     button.className = "history-item";
     if (report.date === state.currentDate) button.classList.add("is-active");
+    button.setAttribute("aria-label", `${report.date}｜${signals.map((signal) => signal.label).join("；")}。選擇此日期。`);
     const date = document.createElement("span");
     date.className = "history-date";
     date.textContent = report.date.slice(5).replace("-", "/");
@@ -2419,7 +2496,7 @@ function renderHistory(index) {
       : report.date === index.latestDate
         ? "最新快照"
         : "盤後快照";
-    button.append(date, copy);
+    button.append(date, buildHistoryStateRail(snapshot, previousSnapshot), copy);
     button.addEventListener("click", () => loadReport(report.date));
     els.historyList.appendChild(button);
   }
