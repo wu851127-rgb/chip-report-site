@@ -5,10 +5,12 @@ const state = {
   researchFramework: null,
   deskViewOverrides: null,
   historyMonth: null,
+  snapshotTransitionTimer: null,
 };
 
 const els = {
   sidebar: document.querySelector("#sidebar"),
+  content: document.querySelector(".content"),
   historyList: document.querySelector("#historyList"),
   historyMonthFilter: document.querySelector("#historyMonthFilter"),
   historyMeta: document.querySelector("#historyMeta"),
@@ -2572,6 +2574,9 @@ async function loadIndex() {
 }
 
 async function loadReport(date, updateQuery = true) {
+  const shouldAnimateSnapshot = state.currentDate !== null && state.currentDate !== date;
+  if (shouldAnimateSnapshot) startSnapshotTransition();
+
   const report = await fetchReport(date);
   const historyReports = await loadHistoryReports(date, 46);
   const retailPosition = buildRetailPositionFromHistory(historyReports);
@@ -2605,6 +2610,25 @@ async function loadReport(date, updateQuery = true) {
   renderSections(els.detailSections, report.detail.sections);
   renderStatus(state.index, state.currentDate);
   renderHistory(state.index);
+  if (shouldAnimateSnapshot) finishSnapshotTransition();
+}
+
+function startSnapshotTransition() {
+  if (!els.content) return;
+  if (state.snapshotTransitionTimer) window.clearTimeout(state.snapshotTransitionTimer);
+  els.content.classList.remove("is-snapshot-entering");
+  els.content.classList.add("is-snapshot-loading");
+}
+
+function finishSnapshotTransition() {
+  if (!els.content) return;
+  els.content.classList.remove("is-snapshot-loading", "is-snapshot-entering");
+  void els.content.offsetWidth;
+  els.content.classList.add("is-snapshot-entering");
+  state.snapshotTransitionTimer = window.setTimeout(() => {
+    els.content.classList.remove("is-snapshot-entering");
+    state.snapshotTransitionTimer = null;
+  }, 520);
 }
 
 function renderHeroTitle(title) {

@@ -295,6 +295,39 @@ body {
   gap: 14px;
 }
 
+.content.is-snapshot-loading .hero,
+.content.is-snapshot-loading .tabs,
+.content.is-snapshot-loading .view.is-active > * {
+  opacity: 0.46;
+  filter: saturate(0.72);
+  transition: opacity 130ms linear, filter 130ms linear;
+}
+
+.content.is-snapshot-entering .hero,
+.content.is-snapshot-entering .tabs,
+.content.is-snapshot-entering .view.is-active > * {
+  animation: snapshot-arrive 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.content.is-snapshot-entering .tabs { animation-delay: 18ms; }
+.content.is-snapshot-entering .view.is-active > *:nth-child(1) { animation-delay: 42ms; }
+.content.is-snapshot-entering .view.is-active > *:nth-child(2) { animation-delay: 68ms; }
+.content.is-snapshot-entering .view.is-active > *:nth-child(3) { animation-delay: 94ms; }
+.content.is-snapshot-entering .view.is-active > *:nth-child(n + 4) { animation-delay: 120ms; }
+
+@keyframes snapshot-arrive {
+  from {
+    opacity: 0;
+    filter: blur(0.8px);
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
 .hero,
 .section-block,
 .summary-block {
@@ -2088,10 +2121,10 @@ body {
   padding: 0 0 0 7px;
   border: 0;
   border-left: 2px solid rgba(143, 163, 187, 0.54);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
-  color: #7589a3;
-  letter-spacing: 0.14em;
+  color: #8297b1;
+  letter-spacing: 0.17em;
   line-height: 1;
   text-transform: uppercase;
   font-family: var(--mono);
@@ -2099,21 +2132,24 @@ body {
 
 .card-value {
   margin: 0 0 9px;
-  font-size: 24px;
-  line-height: 1.1;
+  font-size: 25px;
+  line-height: 1.06;
   font-weight: 800;
-  color: var(--text);
+  color: #f5f9ff;
   word-break: break-word;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
   letter-spacing: -0.04em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
   transform-origin: left center;
   transition: transform 140ms ease, text-shadow 140ms ease;
 }
 
 .card-primary .card-value {
-  font-size: 30px;
-  line-height: 1.04;
+  font-size: 32px;
+  line-height: 1;
+  letter-spacing: -0.055em;
 }
 
 .card:hover {
@@ -2223,9 +2259,24 @@ body {
   font-size: 9px;
   line-height: 1.5;
   font-family: var(--mono);
-  color: #7589a3;
-  opacity: 0.82;
-  letter-spacing: 0.01em;
+  color: #71859e;
+  opacity: 0.72;
+  letter-spacing: 0.015em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content.is-snapshot-loading .hero,
+  .content.is-snapshot-loading .tabs,
+  .content.is-snapshot-loading .view.is-active > *,
+  .content.is-snapshot-entering .hero,
+  .content.is-snapshot-entering .tabs,
+  .content.is-snapshot-entering .view.is-active > * {
+    animation: none;
+    filter: none;
+    opacity: 1;
+    transition: none;
+    transform: none;
+  }
 }
 
 .card-bull .card-value {
