@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>台股盤後籌碼儀表板</title>
-    <link rel="stylesheet" href="./styles.css?v=20260919-history-rail" />
+    <link rel="stylesheet" href="./styles.css?v=20260920-legend-hierarchy" />
   </head>
   <body>
     <div class="shell">
@@ -26,6 +26,10 @@
               <button id="refreshButton" type="button">更新</button>
             </div>
           </div>
+          <p class="history-legend" aria-label="歷史色條由左至右依序為大盤、外資期貨、選擇權輪廓與散戶位階；紅色代表走強或回補，綠色代表轉弱，粉色代表壓力或擁擠，灰色代表中性或訊號未同步。">
+            <span title="大盤動能">市</span><span title="外資期貨">期</span><span title="選擇權輪廓">權</span><span title="散戶位階">散</span>
+            <em>紅強／綠弱／粉壓／灰中性</em>
+          </p>
           <label class="history-filter-label" for="historyMonthFilter">選擇月份</label>
           <select id="historyMonthFilter" class="history-month-filter"></select>
           <nav id="historyList" class="history-list"></nav>
@@ -141,6 +145,6 @@
       <p class="trend-tooltip-reading"></p>
     </aside>
 
-    <script type="module" src="./app.js?v=20260919-history-rail"></script>
+    <script type="module" src="./app.js?v=20260920-legend-hierarchy"></script>
   </body>
 </html>

@@ -137,6 +137,35 @@ body {
   letter-spacing: 0.04em;
 }
 
+.history-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: -2px 0 1px;
+  min-height: 14px;
+  color: #788ca6;
+  font: 700 8px var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.history-legend span {
+  display: inline-grid;
+  width: 13px;
+  height: 13px;
+  place-items: center;
+  border: 1px solid rgba(143, 163, 187, 0.32);
+  color: #b8c7d8;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.history-legend em {
+  margin-left: 3px;
+  color: #71849d;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
 .history-actions {
   display: flex;
   gap: 5px;
@@ -2052,34 +2081,39 @@ body {
 }
 
 .card-label {
-  margin: 0 0 8px;
+  margin: 0 0 9px;
   display: inline-flex;
   align-items: center;
   min-height: 16px;
   padding: 0 0 0 7px;
   border: 0;
   border-left: 2px solid rgba(143, 163, 187, 0.54);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
-  color: var(--muted);
-  letter-spacing: 0.12em;
+  color: #7589a3;
+  letter-spacing: 0.14em;
   line-height: 1;
   text-transform: uppercase;
   font-family: var(--mono);
 }
 
 .card-value {
-  margin: 0 0 8px;
-  font-size: 22px;
+  margin: 0 0 9px;
+  font-size: 24px;
   line-height: 1.1;
   font-weight: 800;
   color: var(--text);
   word-break: break-word;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   transform-origin: left center;
   transition: transform 140ms ease, text-shadow 140ms ease;
+}
+
+.card-primary .card-value {
+  font-size: 30px;
+  line-height: 1.04;
 }
 
 .card:hover {
@@ -2186,10 +2220,12 @@ body {
 
 .card-note {
   margin: 0;
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 9px;
+  line-height: 1.5;
   font-family: var(--mono);
-  opacity: 0.88;
+  color: #7589a3;
+  opacity: 0.82;
+  letter-spacing: 0.01em;
 }
 
 .card-bull .card-value {
