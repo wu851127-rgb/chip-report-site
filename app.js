@@ -2035,19 +2035,53 @@ function buildShortTrendPanel(historyReports) {
   panel.appendChild(rows);
 
   const refs = [];
-  let activeIndex = rawSamples.length - 1;
+  let activeIndex = -1;
+  let scrubFrame = 0;
+  let pendingSelection = null;
   const width = 210;
   const height = 32;
   const padding = 4;
   const formatChange = (value, numFmt) => `${value > 0 ? "+" : ""}${renderValue(value, numFmt)}`;
   const updateSelected = (selectedIndex) => {
-    activeIndex = selectedIndex;
-    const sample = rawSamples[selectedIndex] ?? rawSamples.at(-1);
-    selectedDate.textContent = `${sample.date}｜移動節點可交叉比對同一交易日`;
+    const nextIndex = Math.max(0, Math.min(rawSamples.length - 1, selectedIndex));
+    if (nextIndex === activeIndex) return false;
+    activeIndex = nextIndex;
+    const sample = rawSamples[activeIndex] ?? rawSamples.at(-1);
+    selectedDate.textContent = `${sample.date}｜軌道滑讀，可交叉比對同一交易日`;
     refs.forEach((ref) => {
       const value = sample[ref.definition.key];
       ref.value.textContent = value === null ? "—" : renderValue(value, ref.definition.numFmt);
-      ref.dots.forEach((dot, index) => dot.classList.toggle("is-selected", index === selectedIndex));
+      ref.dots.forEach((dot, index) => {
+        const isSelected = index === activeIndex;
+        dot.classList.toggle("is-selected", isSelected);
+        dot.setAttribute("r", isSelected ? "4" : "2.5");
+      });
+      ref.guide.setAttribute("x1", String(ref.xAt(activeIndex)));
+      ref.guide.setAttribute("x2", String(ref.xAt(activeIndex)));
+    });
+    return true;
+  };
+  const indexFromPointer = (event, chart) => {
+    const rect = chart.getBoundingClientRect();
+    if (!rect.width) return activeIndex < 0 ? rawSamples.length - 1 : activeIndex;
+    const paddingRatio = padding / width;
+    const position = (event.clientX - rect.left) / rect.width;
+    const normalized = Math.max(0, Math.min(1, (position - paddingRatio) / (1 - paddingRatio * 2)));
+    return Math.round(normalized * (rawSamples.length - 1));
+  };
+  const queueChartSelection = (event, row, definition, chart) => {
+    const selectedIndex = indexFromPointer(event, chart);
+    pendingSelection = { selectedIndex, row, definition };
+    if (scrubFrame) return;
+    scrubFrame = window.requestAnimationFrame(() => {
+      scrubFrame = 0;
+      const selection = pendingSelection;
+      pendingSelection = null;
+      if (!selection) return;
+      const changed = updateSelected(selection.selectedIndex);
+      if (changed || els.trendTooltip.hidden) {
+        showTrendTooltip(selection.row, selection.definition, rawSamples[activeIndex]);
+      }
     });
   };
 
@@ -2104,6 +2138,13 @@ function buildShortTrendPanel(historyReports) {
     path.setAttribute("class", "trend-strip-line");
     path.setAttribute("d", pathData);
     chart.appendChild(path);
+    const guide = document.createElementNS(chart.namespaceURI, "line");
+    guide.setAttribute("class", "trend-strip-selection-guide");
+    guide.setAttribute("x1", String(xAt(rawSamples.length - 1)));
+    guide.setAttribute("x2", String(xAt(rawSamples.length - 1)));
+    guide.setAttribute("y1", "0");
+    guide.setAttribute("y2", String(height));
+    chart.appendChild(guide);
     const dots = [];
     values.forEach((item, index) => {
       if (item === null) return;
@@ -2115,10 +2156,6 @@ function buildShortTrendPanel(historyReports) {
       dot.setAttribute("tabindex", "0");
       dot.setAttribute("role", "button");
       dot.setAttribute("aria-label", `${rawSamples[index].date} ${definition.label} ${renderValue(item, definition.numFmt)}`);
-      dot.addEventListener("pointerenter", () => {
-        updateSelected(index);
-        showTrendTooltip(row, definition, rawSamples[index]);
-      });
       dot.addEventListener("focus", () => {
         updateSelected(index);
         showTrendTooltip(row, definition, rawSamples[index]);
@@ -2130,6 +2167,18 @@ function buildShortTrendPanel(historyReports) {
       chart.appendChild(dot);
       dots[index] = dot;
     });
+    const scrubSurface = document.createElementNS(chart.namespaceURI, "rect");
+    scrubSurface.setAttribute("class", "trend-strip-scrub-surface");
+    scrubSurface.setAttribute("x", "0");
+    scrubSurface.setAttribute("y", "0");
+    scrubSurface.setAttribute("width", String(width));
+    scrubSurface.setAttribute("height", String(height));
+    scrubSurface.setAttribute("fill", "transparent");
+    scrubSurface.setAttribute("aria-hidden", "true");
+    scrubSurface.addEventListener("pointerenter", (event) => queueChartSelection(event, row, definition, chart));
+    scrubSurface.addEventListener("pointermove", (event) => queueChartSelection(event, row, definition, chart));
+    scrubSurface.addEventListener("pointerdown", (event) => queueChartSelection(event, row, definition, chart));
+    chart.appendChild(scrubSurface);
     const change = document.createElement("span");
     change.className = "trend-strip-change";
     change.textContent = `5D ${formatChange(delta, definition.numFmt)}`;
@@ -2140,9 +2189,6 @@ function buildShortTrendPanel(historyReports) {
     copy.append(value, unit);
     row.append(label, copy, chart, change);
     row.addEventListener("pointerenter", () => showTrendTooltip(row, definition, rawSamples[activeIndex]));
-    row.addEventListener("pointermove", () => {
-      if (!els.trendTooltip.hidden) positionTrendTooltip(row);
-    });
     row.addEventListener("pointerleave", hideTrendTooltip);
     row.addEventListener("focusin", () => showTrendTooltip(row, definition, rawSamples[activeIndex]));
     row.addEventListener("focusout", (event) => {
@@ -2150,7 +2196,7 @@ function buildShortTrendPanel(historyReports) {
     });
     bindResearchRelationInteraction(row);
     rows.appendChild(row);
-    refs.push({ definition, value, dots });
+    refs.push({ definition, value, dots, guide, xAt });
   }
   updateSelected(rawSamples.length - 1);
   return panel;

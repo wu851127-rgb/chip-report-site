@@ -820,9 +820,9 @@ body {
 
 .trend-strip-dot {
   fill: currentColor;
-  cursor: crosshair;
   opacity: 0.38;
-  transition: opacity 110ms ease, r 110ms ease, filter 110ms ease;
+  pointer-events: none;
+  transition: opacity 90ms ease;
 }
 
 .trend-strip-dot:hover,
@@ -830,12 +830,24 @@ body {
 .trend-strip-dot.is-selected {
   outline: none;
   opacity: 1;
-  filter: brightness(1.45);
 }
 
 .trend-strip-dot:focus-visible {
   stroke: #fff0b0;
   stroke-width: 1.2;
+}
+
+.trend-strip-selection-guide {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.trend-strip-scrub-surface {
+  cursor: crosshair;
+  touch-action: manipulation;
 }
 
 .trend-strip-change {
