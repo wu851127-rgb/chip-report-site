@@ -1961,7 +1961,8 @@ function bindCardInteraction(node, card, sectionTitle) {
 }
 
 function buildShortTrendPanel(historyReports) {
-  const rawSamples = historyReports.slice(0, 5).reverse().map((report) => {
+  // History may arrive newest-first; always render and scrub from oldest to newest.
+  const rawSamples = historyReports.slice(0, 5).map((report) => {
     const retailNet = getReportCardValue(report, "小台+微台等值淨多空")
       ?? (() => {
         const small = getReportCardValue(report, "散戶未平倉");
@@ -1977,7 +1978,7 @@ function buildShortTrendPanel(historyReports) {
       putDefense: getReportCardValue(report, "外資(賣)OP未平倉金額"),
       retailNet,
     };
-  }).filter((sample) => sample.date);
+  }).filter((sample) => sample.date).sort((left, right) => left.date.localeCompare(right.date));
   if (rawSamples.length < 2) return null;
 
   const definitions = [
@@ -2038,6 +2039,7 @@ function buildShortTrendPanel(historyReports) {
   let activeIndex = -1;
   let scrubFrame = 0;
   let pendingSelection = null;
+  let tooltipRow = null;
   const width = 210;
   const height = 32;
   const padding = 4;
@@ -2064,10 +2066,14 @@ function buildShortTrendPanel(historyReports) {
   const indexFromPointer = (event, chart) => {
     const rect = chart.getBoundingClientRect();
     if (!rect.width) return activeIndex < 0 ? rawSamples.length - 1 : activeIndex;
-    const paddingRatio = padding / width;
-    const position = (event.clientX - rect.left) / rect.width;
-    const normalized = Math.max(0, Math.min(1, (position - paddingRatio) / (1 - paddingRatio * 2)));
-    return Math.round(normalized * (rawSamples.length - 1));
+    // Use five equal hit zones instead of the line's padded drawing coordinates.
+    // This makes both endpoints reliable and the reading order explicit: oldest -> newest.
+    const position = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    return Math.min(rawSamples.length - 1, Math.floor(position * rawSamples.length));
+  };
+  const revealTrendTooltip = (row, definition) => {
+    tooltipRow = row;
+    showTrendTooltip(row, definition, rawSamples[activeIndex]);
   };
   const queueChartSelection = (event, row, definition, chart) => {
     const selectedIndex = indexFromPointer(event, chart);
@@ -2079,8 +2085,8 @@ function buildShortTrendPanel(historyReports) {
       pendingSelection = null;
       if (!selection) return;
       const changed = updateSelected(selection.selectedIndex);
-      if (changed || els.trendTooltip.hidden) {
-        showTrendTooltip(selection.row, selection.definition, rawSamples[activeIndex]);
+      if (changed || els.trendTooltip.hidden || tooltipRow !== selection.row) {
+        revealTrendTooltip(selection.row, selection.definition);
       }
     });
   };
@@ -2173,12 +2179,14 @@ function buildShortTrendPanel(historyReports) {
     scrubSurface.setAttribute("y", "0");
     scrubSurface.setAttribute("width", String(width));
     scrubSurface.setAttribute("height", String(height));
-    scrubSurface.setAttribute("fill", "transparent");
+    scrubSurface.setAttribute("fill", "#000");
+    scrubSurface.setAttribute("fill-opacity", "0.001");
+    scrubSurface.setAttribute("pointer-events", "all");
     scrubSurface.setAttribute("aria-hidden", "true");
-    scrubSurface.addEventListener("pointerenter", (event) => queueChartSelection(event, row, definition, chart));
-    scrubSurface.addEventListener("pointermove", (event) => queueChartSelection(event, row, definition, chart));
-    scrubSurface.addEventListener("pointerdown", (event) => queueChartSelection(event, row, definition, chart));
     chart.appendChild(scrubSurface);
+    ["pointerenter", "pointermove", "pointerdown", "click"].forEach((eventName) => {
+      chart.addEventListener(eventName, (event) => queueChartSelection(event, row, definition, chart));
+    });
     const change = document.createElement("span");
     change.className = "trend-strip-change";
     change.textContent = `5D ${formatChange(delta, definition.numFmt)}`;
@@ -2188,11 +2196,17 @@ function buildShortTrendPanel(historyReports) {
     copy.className = "trend-strip-value-wrap";
     copy.append(value, unit);
     row.append(label, copy, chart, change);
-    row.addEventListener("pointerenter", () => showTrendTooltip(row, definition, rawSamples[activeIndex]));
-    row.addEventListener("pointerleave", hideTrendTooltip);
-    row.addEventListener("focusin", () => showTrendTooltip(row, definition, rawSamples[activeIndex]));
+    row.addEventListener("pointerenter", () => revealTrendTooltip(row, definition));
+    row.addEventListener("pointerleave", () => {
+      tooltipRow = null;
+      hideTrendTooltip();
+    });
+    row.addEventListener("focusin", () => revealTrendTooltip(row, definition));
     row.addEventListener("focusout", (event) => {
-      if (!row.contains(event.relatedTarget)) hideTrendTooltip();
+      if (!row.contains(event.relatedTarget)) {
+        tooltipRow = null;
+        hideTrendTooltip();
+      }
     });
     bindResearchRelationInteraction(row);
     rows.appendChild(row);

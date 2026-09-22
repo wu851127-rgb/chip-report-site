@@ -847,6 +847,7 @@ body {
 
 .trend-strip-scrub-surface {
   cursor: crosshair;
+  pointer-events: all;
   touch-action: manipulation;
 }
 
