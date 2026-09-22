@@ -741,8 +741,61 @@ body {
 
 .trend-strip-legend {
   margin-top: 5px;
-  padding-bottom: 7px;
-  border-bottom: 1px solid rgba(143, 163, 187, 0.16);
+  margin-bottom: 8px;
+}
+
+.trend-strip-date-rail {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0 0 7px;
+  padding: 7px 5px 5px;
+  border-block: 1px solid rgba(143, 163, 187, 0.16);
+}
+
+.trend-strip-date-node {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 0 2px 3px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #7890a7;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.trend-strip-date-node i {
+  display: block;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #7890a7;
+  border-radius: 50%;
+  background: #081421;
+  box-shadow: 0 0 0 3px rgba(120, 144, 167, 0.08);
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.trend-strip-date-node:hover,
+.trend-strip-date-node:focus-visible,
+.trend-strip-date-node.is-selected {
+  border-bottom-color: #e8bd65;
+  color: #e8bd65;
+  outline: none;
+}
+
+.trend-strip-date-node:hover i,
+.trend-strip-date-node:focus-visible i,
+.trend-strip-date-node.is-selected i {
+  border-color: #ffe09a;
+  background: #e8bd65;
+  box-shadow: 0 0 0 3px rgba(232, 189, 101, 0.16), 0 0 10px rgba(232, 189, 101, 0.22);
+  transform: scale(1.14);
 }
 
 .trend-strip-rows {
@@ -820,9 +873,12 @@ body {
 
 .trend-strip-dot {
   fill: currentColor;
-  opacity: 0.38;
-  pointer-events: none;
-  transition: opacity 90ms ease;
+  opacity: 0.72;
+  pointer-events: all;
+  stroke: #07111e;
+  stroke-width: 1.2;
+  cursor: pointer;
+  transition: opacity 90ms ease, stroke-width 90ms ease;
 }
 
 .trend-strip-dot:hover,
@@ -830,6 +886,8 @@ body {
 .trend-strip-dot.is-selected {
   outline: none;
   opacity: 1;
+  stroke: #fff0b0;
+  stroke-width: 1.6;
 }
 
 .trend-strip-dot:focus-visible {
@@ -843,12 +901,6 @@ body {
   stroke-dasharray: 2 2;
   opacity: 0.5;
   pointer-events: none;
-}
-
-.trend-strip-scrub-surface {
-  cursor: crosshair;
-  pointer-events: all;
-  touch-action: manipulation;
 }
 
 .trend-strip-change {

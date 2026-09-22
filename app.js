@@ -2029,16 +2029,19 @@ function buildShortTrendPanel(historyReports) {
 
   const legend = document.createElement("p");
   legend.className = "trend-strip-legend";
-  legend.textContent = "最近 5 個交易日，共用日期索引；各列以自身數值縮放，請比較方向與背離，不比較線高。";
+  legend.textContent = "移入下方日期節點即可切換同日資料；各列以自身數值縮放，請比較方向與背離，不比較線高。";
   panel.appendChild(legend);
+  const dateRail = document.createElement("div");
+  dateRail.className = "trend-strip-date-rail";
+  dateRail.setAttribute("aria-label", "五日交易日節點");
+  panel.appendChild(dateRail);
   const rows = document.createElement("div");
   rows.className = "trend-strip-rows";
   panel.appendChild(rows);
 
   const refs = [];
+  const dateNodes = [];
   let activeIndex = -1;
-  let scrubFrame = 0;
-  let pendingSelection = null;
   let tooltipRow = null;
   const width = 210;
   const height = 32;
@@ -2049,47 +2052,43 @@ function buildShortTrendPanel(historyReports) {
     if (nextIndex === activeIndex) return false;
     activeIndex = nextIndex;
     const sample = rawSamples[activeIndex] ?? rawSamples.at(-1);
-    selectedDate.textContent = `${sample.date}｜軌道滑讀，可交叉比對同一交易日`;
+    selectedDate.textContent = `${sample.date}｜五日節點交叉比對`;
+    dateNodes.forEach((node, index) => {
+      const isSelected = index === activeIndex;
+      node.classList.toggle("is-selected", isSelected);
+      node.setAttribute("aria-pressed", String(isSelected));
+    });
     refs.forEach((ref) => {
       const value = sample[ref.definition.key];
       ref.value.textContent = value === null ? "—" : renderValue(value, ref.definition.numFmt);
       ref.dots.forEach((dot, index) => {
         const isSelected = index === activeIndex;
         dot.classList.toggle("is-selected", isSelected);
-        dot.setAttribute("r", isSelected ? "4" : "2.5");
+        dot.setAttribute("r", isSelected ? "4.8" : "3.2");
       });
       ref.guide.setAttribute("x1", String(ref.xAt(activeIndex)));
       ref.guide.setAttribute("x2", String(ref.xAt(activeIndex)));
     });
     return true;
   };
-  const indexFromPointer = (event, chart) => {
-    const rect = chart.getBoundingClientRect();
-    if (!rect.width) return activeIndex < 0 ? rawSamples.length - 1 : activeIndex;
-    // Use five equal hit zones instead of the line's padded drawing coordinates.
-    // This makes both endpoints reliable and the reading order explicit: oldest -> newest.
-    const position = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-    return Math.min(rawSamples.length - 1, Math.floor(position * rawSamples.length));
-  };
   const revealTrendTooltip = (row, definition) => {
     tooltipRow = row;
     showTrendTooltip(row, definition, rawSamples[activeIndex]);
   };
-  const queueChartSelection = (event, row, definition, chart) => {
-    const selectedIndex = indexFromPointer(event, chart);
-    pendingSelection = { selectedIndex, row, definition };
-    if (scrubFrame) return;
-    scrubFrame = window.requestAnimationFrame(() => {
-      scrubFrame = 0;
-      const selection = pendingSelection;
-      pendingSelection = null;
-      if (!selection) return;
-      const changed = updateSelected(selection.selectedIndex);
-      if (changed || els.trendTooltip.hidden || tooltipRow !== selection.row) {
-        revealTrendTooltip(selection.row, selection.definition);
-      }
-    });
-  };
+  rawSamples.forEach((sample, index) => {
+    const node = document.createElement("button");
+    node.type = "button";
+    node.className = "trend-strip-date-node";
+    node.setAttribute("aria-label", `切換至 ${sample.date}`);
+    node.setAttribute("aria-pressed", "false");
+    node.innerHTML = `<i aria-hidden="true"></i><span>${sample.date.slice(5).replace("-", "/")}</span>`;
+    const selectDate = () => updateSelected(index);
+    node.addEventListener("pointerenter", selectDate);
+    node.addEventListener("focus", selectDate);
+    node.addEventListener("click", selectDate);
+    dateRail.appendChild(node);
+    dateNodes.push(node);
+  });
 
   for (const definition of definitions) {
     const values = rawSamples.map((sample) => sample[definition.key]);
@@ -2158,34 +2157,24 @@ function buildShortTrendPanel(historyReports) {
       dot.setAttribute("class", "trend-strip-dot");
       dot.setAttribute("cx", String(xAt(index)));
       dot.setAttribute("cy", String(yAt(item)));
-      dot.setAttribute("r", "2.5");
+      dot.setAttribute("r", "3.2");
       dot.setAttribute("tabindex", "0");
       dot.setAttribute("role", "button");
       dot.setAttribute("aria-label", `${rawSamples[index].date} ${definition.label} ${renderValue(item, definition.numFmt)}`);
       dot.addEventListener("focus", () => {
         updateSelected(index);
-        showTrendTooltip(row, definition, rawSamples[index]);
+        revealTrendTooltip(row, definition);
+      });
+      dot.addEventListener("pointerenter", () => {
+        updateSelected(index);
+        revealTrendTooltip(row, definition);
       });
       dot.addEventListener("click", () => {
         updateSelected(index);
-        showTrendTooltip(row, definition, rawSamples[index]);
+        revealTrendTooltip(row, definition);
       });
       chart.appendChild(dot);
       dots[index] = dot;
-    });
-    const scrubSurface = document.createElementNS(chart.namespaceURI, "rect");
-    scrubSurface.setAttribute("class", "trend-strip-scrub-surface");
-    scrubSurface.setAttribute("x", "0");
-    scrubSurface.setAttribute("y", "0");
-    scrubSurface.setAttribute("width", String(width));
-    scrubSurface.setAttribute("height", String(height));
-    scrubSurface.setAttribute("fill", "#000");
-    scrubSurface.setAttribute("fill-opacity", "0.001");
-    scrubSurface.setAttribute("pointer-events", "all");
-    scrubSurface.setAttribute("aria-hidden", "true");
-    chart.appendChild(scrubSurface);
-    ["pointerenter", "pointermove", "pointerdown", "click"].forEach((eventName) => {
-      chart.addEventListener(eventName, (event) => queueChartSelection(event, row, definition, chart));
     });
     const change = document.createElement("span");
     change.className = "trend-strip-change";
