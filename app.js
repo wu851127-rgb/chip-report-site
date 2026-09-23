@@ -2035,6 +2035,16 @@ function buildShortTrendPanel(historyReports) {
   dateRail.className = "trend-strip-date-rail";
   dateRail.setAttribute("aria-label", "五日交易日節點");
   panel.appendChild(dateRail);
+  const compareBar = document.createElement("div");
+  compareBar.className = "trend-strip-compare-bar";
+  const compareCopy = document.createElement("span");
+  const clearCompare = document.createElement("button");
+  clearCompare.type = "button";
+  clearCompare.className = "trend-strip-compare-clear";
+  clearCompare.textContent = "解除比較";
+  clearCompare.hidden = true;
+  compareBar.append(compareCopy, clearCompare);
+  panel.appendChild(compareBar);
   const rows = document.createElement("div");
   rows.className = "trend-strip-rows";
   panel.appendChild(rows);
@@ -2042,11 +2052,35 @@ function buildShortTrendPanel(historyReports) {
   const refs = [];
   const dateNodes = [];
   let activeIndex = -1;
+  let comparisonIndex = null;
   let tooltipRow = null;
   const width = 210;
   const height = 32;
   const padding = 4;
   const formatChange = (value, numFmt) => `${value > 0 ? "+" : ""}${renderValue(value, numFmt)}`;
+  const formatComparison = (value, baseline, numFmt) => {
+    if (value === null || baseline === null) return "—";
+    return formatChange(value - baseline, numFmt);
+  };
+  const updateComparison = () => {
+    const current = rawSamples[activeIndex] ?? rawSamples.at(-1);
+    const baseline = comparisonIndex === null ? null : rawSamples[comparisonIndex];
+    const isComparing = Boolean(baseline);
+    compareBar.classList.toggle("is-active", isComparing);
+    compareCopy.textContent = isComparing
+      ? `基準 ${baseline.date.slice(5).replace("-", "/")}｜目前 ${current.date.slice(5).replace("-", "/")}｜右側為相對基準差異`
+      : "點選一個日期節點，固定為比較基準日";
+    clearCompare.hidden = !isComparing;
+    dateNodes.forEach((node, index) => node.classList.toggle("is-reference", index === comparisonIndex));
+    refs.forEach((ref) => {
+      const currentValue = current[ref.definition.key];
+      const baselineValue = baseline?.[ref.definition.key] ?? null;
+      ref.change.classList.toggle("is-compare", isComparing);
+      ref.change.textContent = isComparing
+        ? `Δ ${formatComparison(currentValue, baselineValue, ref.definition.numFmt)}`
+        : ref.defaultChange;
+    });
+  };
   const updateSelected = (selectedIndex) => {
     const nextIndex = Math.max(0, Math.min(rawSamples.length - 1, selectedIndex));
     if (nextIndex === activeIndex) return false;
@@ -2069,6 +2103,7 @@ function buildShortTrendPanel(historyReports) {
       ref.guide.setAttribute("x1", String(ref.xAt(activeIndex)));
       ref.guide.setAttribute("x2", String(ref.xAt(activeIndex)));
     });
+    updateComparison();
     return true;
   };
   const revealTrendTooltip = (row, definition) => {
@@ -2079,13 +2114,17 @@ function buildShortTrendPanel(historyReports) {
     const node = document.createElement("button");
     node.type = "button";
     node.className = "trend-strip-date-node";
-    node.setAttribute("aria-label", `切換至 ${sample.date}`);
+    node.setAttribute("aria-label", `切換至 ${sample.date}；點選可固定為比較基準`);
     node.setAttribute("aria-pressed", "false");
     node.innerHTML = `<i aria-hidden="true"></i><span>${sample.date.slice(5).replace("-", "/")}</span>`;
     const selectDate = () => updateSelected(index);
     node.addEventListener("pointerenter", selectDate);
     node.addEventListener("focus", selectDate);
-    node.addEventListener("click", selectDate);
+    node.addEventListener("click", () => {
+      updateSelected(index);
+      comparisonIndex = comparisonIndex === index ? null : index;
+      updateComparison();
+    });
     dateRail.appendChild(node);
     dateNodes.push(node);
   });
@@ -2178,7 +2217,8 @@ function buildShortTrendPanel(historyReports) {
     });
     const change = document.createElement("span");
     change.className = "trend-strip-change";
-    change.textContent = `5D ${formatChange(delta, definition.numFmt)}`;
+    const defaultChange = `5D ${formatChange(delta, definition.numFmt)}`;
+    change.textContent = defaultChange;
     const unit = document.createElement("small");
     unit.textContent = definition.unit;
     const copy = document.createElement("div");
@@ -2199,8 +2239,12 @@ function buildShortTrendPanel(historyReports) {
     });
     bindResearchRelationInteraction(row);
     rows.appendChild(row);
-    refs.push({ definition, value, dots, guide, xAt });
+    refs.push({ definition, value, dots, guide, xAt, change, defaultChange });
   }
+  clearCompare.addEventListener("click", () => {
+    comparisonIndex = null;
+    updateComparison();
+  });
   updateSelected(rawSamples.length - 1);
   return panel;
 }

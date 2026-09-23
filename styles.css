@@ -798,6 +798,61 @@ body {
   transform: scale(1.14);
 }
 
+.trend-strip-date-node.is-reference {
+  border-bottom-color: #62cadd;
+  color: #83ddeb;
+}
+
+.trend-strip-date-node.is-reference i {
+  border-color: #83ddeb;
+  background: #153947;
+  box-shadow: 0 0 0 3px rgba(98, 202, 221, 0.14), 0 0 9px rgba(98, 202, 221, 0.18);
+}
+
+.trend-strip-date-node.is-reference.is-selected i {
+  border-color: #ffe09a;
+  background: #e8bd65;
+  box-shadow: 0 0 0 3px rgba(98, 202, 221, 0.18), 0 0 10px rgba(232, 189, 101, 0.22);
+}
+
+.trend-strip-compare-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 24px;
+  margin: -2px 0 5px;
+  color: #71869b;
+  font-size: 9px;
+  letter-spacing: 0.02em;
+}
+
+.trend-strip-compare-bar.is-active {
+  padding: 5px 7px;
+  border-left: 2px solid #62cadd;
+  background: linear-gradient(90deg, rgba(76, 175, 192, 0.12), transparent 76%);
+  color: #c7e7ed;
+}
+
+.trend-strip-compare-clear {
+  flex: 0 0 auto;
+  border: 1px solid rgba(131, 221, 235, 0.42);
+  background: rgba(5, 19, 30, 0.58);
+  color: #bfe9f0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  padding: 3px 5px;
+}
+
+.trend-strip-compare-clear:hover,
+.trend-strip-compare-clear:focus-visible {
+  border-color: #83ddeb;
+  color: #ffffff;
+  outline: none;
+}
+
 .trend-strip-rows {
   display: grid;
 }
@@ -908,6 +963,10 @@ body {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+.trend-strip-change.is-compare {
+  color: #d8e5ee;
 }
 
 .trend-market.is-up { color: #ff776f; }
