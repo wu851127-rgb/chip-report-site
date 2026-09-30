@@ -476,6 +476,7 @@ function renderScPressurePanel(snapshot) {
   panel.hidden = false;
   panel.className = `sc-pressure-panel ${snapshot.isUpDay ? "" : "is-not-scored"}`;
   panel.setAttribute("aria-label", "上漲日 SC 壓力監測");
+  panel.dataset.relationGroups = "foreign-call";
 
   const head = document.createElement("div");
   head.className = "sc-pressure-head";
@@ -709,6 +710,90 @@ function buildPulseCell({ label, value, detail, tone = "neutral", signal = "", r
   return item;
 }
 
+function buildSignalBalance(report, strategy, optionSnapshot, retailPosition) {
+  const cards = collectCards(report);
+  const indexChange = getCardValue(cards, "加權指數漲跌");
+  const futures = getCardValue(cards, "外資(大小台)期貨未平倉");
+  const futuresDelta = getCardValue(cards, "外資期貨未平倉與前日增減");
+  const metrics = new Map((retailPosition?.metrics ?? []).map((metric) => [metric.key, metric]));
+  const longShareRank = metrics.get("longShare")?.value;
+  const shortShareRank = metrics.get("shortShare")?.value;
+  const longVelocity = metrics.get("equivalentLongVelocity");
+  const shortVelocity = metrics.get("equivalentShortVelocity");
+  const continuation = [];
+  const risk = [];
+  const add = (list, label, groups) => list.push({ label, groups });
+
+  if (indexChange !== null && indexChange >= 0) add(continuation, "價格守穩", ["market-price"]);
+  if (indexChange !== null && indexChange < 0) add(risk, "價格轉弱", ["market-price"]);
+  if (futuresDelta !== null && futuresDelta > 0) add(continuation, futures !== null && futures < 0 ? "期貨回補" : "期貨改善", ["foreign-flow"]);
+  if (futuresDelta !== null && futuresDelta < 0 && futures !== null && futures < 0) add(risk, "期貨防禦升級", ["foreign-flow"]);
+  if (optionSnapshot?.callChange < 0) add(continuation, "CALL 壓力收斂", ["foreign-call"]);
+  if (optionSnapshot?.putChange > 0) add(continuation, "PUT 防守升高", ["foreign-put"]);
+  if (optionSnapshot?.callChange > 0) add(risk, "CALL 壓力升高", ["foreign-call"]);
+  if (optionSnapshot?.putChange < 0) add(risk, "PUT 防守減弱", ["foreign-put"]);
+
+  const longFomo = longVelocity?.current > 0 && ((longVelocity.value ?? 0) >= 75 || (longShareRank ?? 0) >= 75);
+  if (longFomo) add(risk, "多單追價升溫", ["retail-long", "retail-net"]);
+  if (shortVelocity?.current > 0 && (shortShareRank ?? 0) >= 75 && !longFomo) {
+    add(continuation, "空方燃料增加", ["retail-short", "retail-net"]);
+  }
+  if (strategy.tone === "risk" && strategy.flag === "過熱降檔") {
+    add(risk, "過熱需降檔", ["foreign-call", "retail-long"]);
+  }
+
+  const panel = document.createElement("section");
+  panel.className = "signal-balance";
+  panel.setAttribute("aria-label", "結構訊號平衡器");
+  const head = document.createElement("div");
+  head.className = "signal-balance-head";
+  const title = document.createElement("span");
+  title.textContent = "STRUCTURE BALANCE";
+  const note = document.createElement("p");
+  note.textContent = "延續證據與回測風險並列，不是方向分數。";
+  head.append(title, note);
+
+  const lanes = document.createElement("div");
+  lanes.className = "signal-balance-lanes";
+  const buildLane = (label, items, tone, empty) => {
+    const lane = document.createElement("div");
+    lane.className = `signal-balance-lane is-${tone}`;
+    const laneHead = document.createElement("div");
+    const laneLabel = document.createElement("span");
+    laneLabel.textContent = label;
+    const count = document.createElement("strong");
+    count.textContent = String(items.length);
+    laneHead.append(laneLabel, count);
+    const chips = document.createElement("div");
+    chips.className = "signal-balance-chips";
+    if (items.length === 0) {
+      const muted = document.createElement("span");
+      muted.className = "signal-balance-empty";
+      muted.textContent = empty;
+      chips.appendChild(muted);
+    } else {
+      items.forEach((item) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "signal-balance-chip";
+        chip.textContent = item.label;
+        chip.dataset.relationGroups = item.groups.join(" ");
+        chip.addEventListener("click", () => jumpToResearchEvidence(item.groups));
+        bindResearchRelationInteraction(chip);
+        chips.appendChild(chip);
+      });
+    }
+    lane.append(laneHead, chips);
+    return lane;
+  };
+  lanes.append(
+    buildLane("延續證據", continuation, "continuation", "尚無明確共振"),
+    buildLane("回測風險", risk, "risk", "尚無明確升級")
+  );
+  panel.append(head, lanes);
+  return panel;
+}
+
 function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
   const cards = collectCards(report);
   const indexLevel = getCardRender(cards, "加權指數");
@@ -799,6 +884,7 @@ function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
     relationGroups: ["retail-long", "retail-short", "retail-net", "retail-micro"],
   }));
   panel.appendChild(grid);
+  panel.appendChild(buildSignalBalance(report, strategy, optionSnapshot, retailPosition));
 }
 
 function buildDecisionFocus(report, strategy) {
@@ -975,20 +1061,25 @@ const strategyBlockRelations = {
 function bindDeskEvidenceLinks() {
   els.strategyBody.querySelectorAll(".strategy-block[data-relation-groups]").forEach(bindResearchRelationInteraction);
   els.strategyBody.querySelectorAll(".strategy-evidence-link").forEach((button) => {
-    button.addEventListener("click", () => {
-      const groups = nodeRelationGroups(button);
-      const target = [...document.querySelectorAll(".card[data-relation-groups]")]
-        .find((card) => nodeRelationGroups(card).some((group) => groups.includes(group)));
-      hideCardTooltip();
-      setRelationActivity(groups);
-      target?.classList.add("relation-jump");
-      target?.scrollIntoView({ behavior: "smooth", block: "center" });
-      window.setTimeout(() => {
-        document.querySelectorAll(".relation-jump").forEach((card) => card.classList.remove("relation-jump"));
-        document.querySelectorAll(".relation-active").forEach((card) => card.classList.remove("relation-active"));
-      }, 2200);
-    });
+    button.addEventListener("click", () => jumpToResearchEvidence(nodeRelationGroups(button)));
   });
+}
+
+function jumpToResearchEvidence(groups) {
+  hideCardTooltip();
+  setRelationActivity(groups);
+  const activeView = document.querySelector(".view.is-active");
+  const candidates = [
+    ...(activeView?.querySelectorAll(".card[data-relation-groups], .retail-position-panel[data-relation-groups]") ?? []),
+    ...document.querySelectorAll(".option-contour-panel[data-relation-groups], .sc-pressure-panel[data-relation-groups]"),
+  ];
+  const target = candidates.find((node) => nodeRelationGroups(node).some((group) => groups.includes(group)));
+  target?.classList.add("relation-jump");
+  target?.scrollIntoView({ behavior: "smooth", block: "center" });
+  window.setTimeout(() => {
+    document.querySelectorAll(".relation-jump").forEach((node) => node.classList.remove("relation-jump"));
+    clearRelationActivity();
+  }, 2200);
 }
 
 function mergeStrategyBlocks(baseBlocks, overrideBlocks) {
@@ -1714,24 +1805,28 @@ function renderStrategy(report, historyReports = []) {
       value: strategy.flag || firstSentence(blockByLabel.get("主命題")?.text, "盤勢結構判讀"),
       note: strategy.flag ? firstSentence(blockByLabel.get("主命題")?.text) : "以今日籌碼結構定位",
       tone: strategy.tone,
+      relationGroups: ["market-price", "foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short"],
     },
     {
       label: "方向結論",
       value: strategy.toneLabel,
       note: "訊號不是單日預測，需搭配下方條件驗證。",
       tone: strategy.tone,
+      relationGroups: ["foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short"],
     },
     {
       label: "部位節奏",
       value: firstSentence(blockByLabel.get("部位節奏")?.text, "依結構分段處理"),
       note: "先設定條件，再決定加碼或降檔。",
       tone: "neutral",
+      relationGroups: ["market-price", "foreign-flow", "foreign-call", "foreign-put", "retail-net"],
     },
     {
       label: "失效條件",
       value: firstSentence(blockByLabel.get("反證風險")?.text, "持續追蹤反證風險"),
       note: "若失效，應優先收斂風險，不以單一數值硬拗。",
       tone: "risk",
+      relationGroups: ["foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short", "retail-net"],
     },
   ];
   els.strategyDecision.replaceChildren();
@@ -1744,7 +1839,15 @@ function renderStrategy(report, historyReports = []) {
     value.textContent = item.value;
     const note = document.createElement("p");
     note.textContent = item.note;
-    node.append(label, value, note);
+    const anchor = document.createElement("button");
+    anchor.type = "button";
+    anchor.className = "strategy-decision-anchor";
+    anchor.textContent = "查核資料";
+    anchor.setAttribute("aria-label", `${item.label}：查看對應資料`);
+    anchor.dataset.relationGroups = item.relationGroups.join(" ");
+    anchor.addEventListener("click", () => jumpToResearchEvidence(item.relationGroups));
+    bindResearchRelationInteraction(anchor);
+    node.append(label, value, note, anchor);
     els.strategyDecision.appendChild(node);
   }
   els.strategyDetails.open = false;
@@ -2285,6 +2388,8 @@ function buildRetailPositionPanel(position) {
   const panel = document.createElement("aside");
   panel.className = "retail-position-panel";
   panel.setAttribute("aria-label", "散戶位階圖");
+  panel.dataset.relationGroups = "retail-long retail-short retail-net retail-micro";
+  bindResearchRelationInteraction(panel);
 
   const head = document.createElement("div");
   head.className = "retail-position-head";
