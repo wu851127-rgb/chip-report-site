@@ -2775,6 +2775,7 @@ async function loadReport(date, updateQuery = true) {
   const shouldAnimateSnapshot = state.currentDate !== null && state.currentDate !== date;
   if (shouldAnimateSnapshot) startSnapshotTransition();
 
+  try {
   const report = await fetchReport(date);
   const historyReports = await loadHistoryReports(date, 46);
   const retailPosition = buildRetailPositionFromHistory(historyReports);
@@ -2809,6 +2810,10 @@ async function loadReport(date, updateQuery = true) {
   renderStatus(state.index, state.currentDate);
   renderHistory(state.index);
   if (shouldAnimateSnapshot) finishSnapshotTransition();
+  } catch (error) {
+    if (shouldAnimateSnapshot) cancelSnapshotTransition();
+    throw error;
+  }
 }
 
 function startSnapshotTransition() {
@@ -2816,17 +2821,30 @@ function startSnapshotTransition() {
   if (state.snapshotTransitionTimer) window.clearTimeout(state.snapshotTransitionTimer);
   els.content.classList.remove("is-snapshot-entering");
   els.content.classList.add("is-snapshot-loading");
+  els.content.setAttribute("aria-busy", "true");
+  els.sidebar.classList.remove("is-snapshot-entering");
 }
 
 function finishSnapshotTransition() {
   if (!els.content) return;
   els.content.classList.remove("is-snapshot-loading", "is-snapshot-entering");
+  els.content.setAttribute("aria-busy", "false");
   void els.content.offsetWidth;
   els.content.classList.add("is-snapshot-entering");
+  els.sidebar.classList.add("is-snapshot-entering");
   state.snapshotTransitionTimer = window.setTimeout(() => {
     els.content.classList.remove("is-snapshot-entering");
+    els.sidebar.classList.remove("is-snapshot-entering");
     state.snapshotTransitionTimer = null;
-  }, 520);
+  }, 300);
+}
+
+function cancelSnapshotTransition() {
+  if (state.snapshotTransitionTimer) window.clearTimeout(state.snapshotTransitionTimer);
+  els.content?.classList.remove("is-snapshot-loading", "is-snapshot-entering");
+  els.content?.setAttribute("aria-busy", "false");
+  els.sidebar?.classList.remove("is-snapshot-entering");
+  state.snapshotTransitionTimer = null;
 }
 
 function renderHeroTitle(title) {
