@@ -549,7 +549,7 @@ function buildOptionContourSnapshot(historyReports) {
     const bp = getReportCardValue(report, "外資BP金額", { detail: true });
     const sp = getReportCardValue(report, "外資SP金額", { detail: true });
     if ([bc, sc, bp, sp].some((value) => value === null)) return null;
-    return { callPressure: sc - bc, putDefense: bp - sp };
+    return { bc, sc, bp, sp, callPressure: sc - bc, putDefense: bp - sp };
   }).filter(Boolean);
   const current = samples[0] ?? null;
   const previous = samples[1] ?? null;
@@ -561,10 +561,73 @@ function buildOptionContourSnapshot(historyReports) {
     callPressure: current.callPressure,
     callChange: current.callPressure - previous.callPressure,
     callRank: midrankFromValues(samples.map((item) => item.callPressure), current.callPressure),
+    bcAmount: current.bc,
+    bcRank: midrankFromValues(samples.map((item) => item.bc), current.bc),
+    scAmount: current.sc,
+    scRank: midrankFromValues(samples.map((item) => item.sc), current.sc),
     putDefense: current.putDefense,
     putChange: current.putDefense - previous.putDefense,
     putRank: midrankFromValues(samples.map((item) => item.putDefense), current.putDefense),
   };
+}
+
+function buildForeignOptionHeatCell(optionSnapshot, indexChange) {
+  if (!optionSnapshot) {
+    return buildPulseCell({
+      label: "外資選擇權溫度",
+      value: "—",
+      detail: "等待 BC／SC 未平倉金額資料",
+      signal: "資料不足",
+      relationGroups: ["foreign-call", "foreign-put"],
+    });
+  }
+
+  const bcHot = (optionSnapshot.bcRank ?? 0) >= 80;
+  const scHot = (optionSnapshot.scRank ?? 0) >= 80;
+  const dualHot = bcHot && scHot;
+  const callPressureWidening = optionSnapshot.callChange > 0;
+  const priceStalled = indexChange !== null && indexChange <= 0;
+  const isAlert = dualHot && optionSnapshot.callPressure > 0 && callPressureWidening && priceStalled;
+  const signal = isAlert
+    ? "警示｜壓力升級"
+    : dualHot
+      ? optionSnapshot.callPressure > 0 ? "雙高｜待確認" : "雙高｜結構偏強"
+      : bcHot || scHot ? "單邊偏熱" : "結構平衡";
+  const tone = isAlert ? "risk" : dualHot || bcHot || scHot ? "watch" : "neutral";
+
+  const item = document.createElement("article");
+  item.className = `market-pulse-cell option-heat-cell tone-${tone}`;
+  item.dataset.relationGroups = "foreign-call foreign-put market-price";
+  item.setAttribute("aria-label", `外資選擇權溫度：${signal}。可查看 BC、SC 位階與判讀條件。`);
+
+  const head = document.createElement("div");
+  head.className = "market-pulse-cell-head";
+  const name = document.createElement("span");
+  name.textContent = "外資選擇權溫度";
+  const tag = document.createElement("span");
+  tag.className = "market-pulse-tag";
+  tag.textContent = signal;
+  head.append(name, tag);
+
+  const primary = document.createElement("strong");
+  primary.textContent = `CALL ${formatSignedNumber(optionSnapshot.callPressure)}`;
+  const summary = document.createElement("p");
+  summary.textContent = `BC ${renderValue(optionSnapshot.bcRank, "0.0")}% 位階｜SC ${renderValue(optionSnapshot.scRank, "0.0")}% 位階`;
+
+  const detail = document.createElement("div");
+  detail.className = "option-heat-detail";
+  const positions = document.createElement("p");
+  positions.textContent = `BC ${renderValue(optionSnapshot.bcAmount, "#,##0")}｜SC ${renderValue(optionSnapshot.scAmount, "#,##0")} 仟元`;
+  const formula = document.createElement("p");
+  formula.textContent = "溫度以近45筆 BC／SC 金額中間排名衡量；CALL 壓力＝SC－BC。";
+  const reading = document.createElement("p");
+  reading.textContent = isAlert
+    ? "雙高、SC 偏高與壓力擴大同步發生，且價格未延續，升級為回測風險。"
+    : "雙高只表示槓桿集中；需再由壓力增減與價格延續確認，不單獨判定反轉。";
+  detail.append(positions, formula, reading);
+  item.append(head, primary, summary, detail);
+  bindResearchRelationInteraction(item);
+  return item;
 }
 
 function changeLabel(change, side) {
@@ -848,28 +911,7 @@ function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
     relationGroups: ["foreign-flow"],
   }));
 
-  const optionSignal = !optionSnapshot
-    ? "資料不足"
-    : optionSnapshot.callChange < 0 && optionSnapshot.putChange >= 0
-      ? "結構改善"
-      : optionSnapshot.callChange > 0 && optionSnapshot.putChange < 0
-        ? "雙向轉弱"
-        : `${changeLabel(optionSnapshot.callChange, "call")}／${changeLabel(optionSnapshot.putChange, "put")}`;
-  const optionTone = !optionSnapshot
-    ? "neutral"
-    : optionSnapshot.callChange > 0 && optionSnapshot.putChange < 0
-      ? "risk"
-      : optionSnapshot.callChange < 0 && optionSnapshot.putChange >= 0
-        ? "bull"
-        : "neutral";
-  grid.appendChild(buildPulseCell({
-    label: "選擇權輪廓",
-    value: optionSnapshot ? `CALL ${formatSignedNumber(optionSnapshot.callChange)}｜PUT ${formatSignedNumber(optionSnapshot.putChange)}` : "—",
-    detail: "依外資未平倉金額的當日變化計算",
-    tone: optionTone,
-    signal: optionSignal,
-    relationGroups: ["foreign-call", "foreign-put"],
-  }));
+  grid.appendChild(buildForeignOptionHeatCell(optionSnapshot, indexChange));
 
   const retailAssessment = retailPosition?.assessment ?? "資料不足";
   const retailTone = retailAssessment.includes("雙向") ? "risk" : "neutral";
