@@ -181,12 +181,14 @@ function buildRetailPositionFromHistory(historyReports) {
   const equivalentShort = (values) => values["散戶看空"] + values["微台散戶看空"] / 5;
   const equivalentNet = (values) => equivalentLong(values) - equivalentShort(values);
   const longShare = (values) => {
-    const total = equivalentLong(values) + equivalentShort(values);
-    return total ? equivalentLong(values) / total : 0;
+    const long = values["散戶看多"] * 5 + values["微台散戶看多"];
+    const short = values["散戶看空"] * 5 + values["微台散戶看空"];
+    return long + short ? long / (long + short) : 0;
   };
   const shortShare = (values) => {
-    const total = equivalentLong(values) + equivalentShort(values);
-    return total ? equivalentShort(values) / total : 0;
+    const long = values["散戶看多"] * 5 + values["微台散戶看多"];
+    const short = values["散戶看空"] * 5 + values["微台散戶看空"];
+    return long + short ? short / (long + short) : 0;
   };
   const rawLong = (values) => values["散戶看多"] + values["微台散戶看多"];
   const rawShort = (values) => values["散戶看空"] + values["微台散戶看空"];
@@ -194,8 +196,8 @@ function buildRetailPositionFromHistory(historyReports) {
     ["equivalentLong", "散戶多方位階", equivalentLong, "小台散戶看多 + 微台散戶看多 / 5", "多方擁擠"],
     ["equivalentShort", "散戶空方位階", equivalentShort, "小台散戶看空 + 微台散戶看空 / 5", "空方擁擠"],
     ["equivalentNet", "散戶淨多空位階", equivalentNet, "小台＋微台等值多單 - 小台＋微台等值空單", "淨多偏高"],
-    ["longShare", "散戶多單持倉占比", longShare, "等值多單 / (等值多單 + 等值空單)", "多方持倉偏高", "share"],
-    ["shortShare", "散戶空單持倉占比", shortShare, "等值空單 / (等值多單 + 等值空單)", "空方持倉偏高", "share"],
+    ["longShare", "散戶多單實際占比", longShare, "等值多單 / (等值多單 + 等值空單)", "多方持倉偏高", "share"],
+    ["shortShare", "散戶空單實際占比", shortShare, "等值空單 / (等值多單 + 等值空單)", "空方持倉偏高", "share"],
     ["microRatio", "微台多空比位階", (values) => values["微台散戶多空比"], "微台散戶多空比", "微台追價偏熱"],
   ];
   const canRank = samples.length >= 20;
@@ -2482,7 +2484,7 @@ function buildRetailPositionPanel(position) {
       metric,
       primary: renderValue(share, "0.0%"),
       rank,
-      caption: `等值留倉 ${renderValue(equivalent, "#,##0.0")} 口｜水位位階 ${rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}%`}`,
+      caption: `等值留倉 ${renderValue(equivalent, "#,##0.0")} 口｜近45日相對位階 ${rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}%`}`,
       tone: long ? "is-long-share" : "is-short-share",
     };
   };
