@@ -801,7 +801,32 @@ function firstSentence(value, fallback = "—") {
   return match ? match[0] : text;
 }
 
-function buildDecisionSummary(strategy) {
+function buildDirectionalOutlook(strategy, reportDate = null) {
+  const outlook = strategy.outlook;
+  const directions = {
+    bullish: { label: "短線偏多", tone: "bull" },
+    bearish: { label: "短線偏空", tone: "bear" },
+    neutral: { label: "中性震盪", tone: "neutral" },
+  };
+  const nonempty = (value) => typeof value === "string" && value.trim().length > 0;
+  const direction = Object.hasOwn(directions, outlook?.bias) ? directions[outlook.bias] : null;
+  const dateMatches = /^\d{4}-\d{2}-\d{2}$/.test(outlook?.asOfDate ?? "")
+    && (reportDate === null || outlook.asOfDate === reportDate);
+  if (!direction || !dateMatches || ![outlook.qualifier, outlook.horizon, outlook.reason].every(nonempty)) {
+    return { assessed: false, bias: "unassessed", label: "方向未評估", tone: "neutral" };
+  }
+  // Risk level and research archetype are not substitutes for an authored bias.
+  return {
+    assessed: true,
+    bias: outlook.bias,
+    ...direction,
+    qualifier: outlook.qualifier.trim(),
+    horizon: outlook.horizon.trim(),
+    reason: outlook.reason.trim(),
+  };
+}
+
+function buildDecisionSummary(strategy, reportDate = null) {
   const blocks = new Map((strategy.blocks ?? []).map((block) => [block.label, block]));
   const explicit = strategy.summary ?? {};
   const fromBlock = (label, fallback) => firstSentence(blocks.get(label)?.text, fallback);
@@ -813,6 +838,7 @@ function buildDecisionSummary(strategy) {
     validation: explicit.validation || fromBlock("驗證重點", "等待下一個驗證條件。"),
     invalidation: explicit.invalidation || blocks.get("失效條件")?.text || "本日未另列明確失效條件；請展開完整判讀與驗證重點。",
     hasInvalidation: Boolean(explicit.invalidation || blocks.get("失效條件")?.text),
+    outlook: buildDirectionalOutlook(strategy, reportDate),
   };
 }
 
@@ -1002,11 +1028,13 @@ function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
 }
 
 function buildDecisionFocus(report, strategy) {
-  const summary = buildDecisionSummary(strategy);
+  const summary = buildDecisionSummary(strategy, report.date);
+  const outlook = summary.outlook;
   const panel = els.decisionFocus;
   panel.replaceChildren();
   panel.hidden = false;
-  panel.className = `decision-focus tone-${strategy.tone}`;
+  panel.className = `decision-focus tone-${outlook.tone}`;
+  panel.dataset.direction = outlook.bias;
 
   const identity = document.createElement("div");
   identity.className = "decision-focus-identity";
@@ -1021,8 +1049,15 @@ function buildDecisionFocus(report, strategy) {
   const thesisLabel = document.createElement("span");
   thesisLabel.textContent = "當日結論";
   const thesisValue = document.createElement("strong");
-  thesisValue.textContent = summary.conclusion;
-  thesis.append(thesisLabel, thesisValue);
+  thesisValue.className = "decision-direction-label";
+  thesisValue.textContent = outlook.assessed ? `${outlook.label}｜${outlook.qualifier}` : outlook.label;
+  const horizon = document.createElement("small");
+  horizon.className = "decision-direction-horizon";
+  horizon.textContent = outlook.assessed ? outlook.horizon : "此歷史日期尚未另作方向評估";
+  const reason = document.createElement("p");
+  reason.className = "decision-direction-reason";
+  reason.textContent = outlook.assessed ? outlook.reason : summary.conclusion;
+  thesis.append(thesisLabel, thesisValue, horizon, reason);
 
   const actionItem = document.createElement("div");
   actionItem.className = "decision-focus-item";
@@ -1901,13 +1936,15 @@ function renderStrategy(report, historyReports = []) {
   els.strategyTone.textContent = strategy.toneLabel;
   els.strategyTone.className = `strategy-tone tone-${strategy.tone}`;
   const blocks = strategy.blocks ?? [{ label: "Desk View", text: strategy.body }];
-  const summary = buildDecisionSummary(strategy);
+  const summary = buildDecisionSummary(strategy, report.date);
+  const outlook = summary.outlook;
   const decisionItems = [
     {
       label: "核心判讀",
-      value: summary.conclusion,
-      note: "結論先行；完整條件保留於下方判讀。",
-      tone: strategy.tone,
+      value: outlook.assessed ? `${outlook.label}｜${outlook.qualifier}` : summary.conclusion,
+      note: outlook.assessed ? outlook.reason : "方向未評估；結構定位不等於多空方向。",
+      tone: outlook.tone,
+      outlook,
       relationGroups: ["market-price", "foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short"],
     },
     {
@@ -1936,6 +1973,10 @@ function renderStrategy(report, historyReports = []) {
   for (const item of decisionItems) {
     const node = document.createElement("article");
     node.className = `strategy-decision-item tone-${item.tone}`;
+    if (item.outlook) {
+      node.classList.add("is-direction-summary");
+      node.dataset.direction = item.outlook.bias;
+    }
     const label = document.createElement("span");
     label.textContent = item.label;
     const value = document.createElement("strong");
@@ -1950,7 +1991,14 @@ function renderStrategy(report, historyReports = []) {
     anchor.dataset.relationGroups = item.relationGroups.join(" ");
     anchor.addEventListener("click", () => jumpToResearchEvidence(item.relationGroups));
     bindResearchRelationInteraction(anchor);
-    node.append(label, value, note, anchor);
+    node.append(label);
+    if (item.outlook?.assessed) {
+      const horizon = document.createElement("small");
+      horizon.className = "decision-direction-horizon";
+      horizon.textContent = item.outlook.horizon;
+      node.appendChild(horizon);
+    }
+    node.append(value, note, anchor);
     els.strategyDecision.appendChild(node);
   }
   els.strategyDetails.open = false;

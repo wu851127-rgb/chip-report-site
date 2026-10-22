@@ -762,7 +762,7 @@ body {
   top: 10px;
   z-index: 18;
   display: grid;
-  grid-template-columns: 104px minmax(145px, 0.9fr) minmax(210px, 1.45fr) minmax(210px, 1.45fr) auto;
+  grid-template-columns: 104px minmax(235px, 1.5fr) minmax(165px, 0.9fr) minmax(200px, 1.2fr) auto;
   align-items: stretch;
   gap: 0;
   margin: 0 0 14px;
@@ -835,6 +835,20 @@ body {
 .decision-focus.tone-bull .decision-focus-thesis strong { color: #ffb7b2; }
 .decision-focus.tone-bear .decision-focus-thesis strong { color: #a8f0ca; }
 .decision-focus.tone-risk .decision-focus-thesis strong { color: #ffafc0; }
+
+.decision-direction-horizon {
+  display: block;
+  margin-top: 4px;
+  color: #99adc2;
+  font: 500 9px/1.5 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.decision-focus-thesis .decision-direction-label { font-size: 13px; line-height: 1.55; }
+.decision-focus-thesis .decision-direction-reason { font-size: 10px; line-height: 1.6; }
+.decision-focus[data-direction="bearish"] .decision-focus-thesis { background: rgba(47, 207, 122, 0.045); }
+.decision-focus[data-direction="bullish"] .decision-focus-thesis { background: rgba(255, 91, 87, 0.045); }
+.decision-focus[data-direction="unassessed"] .decision-direction-label { color: #a9bacd; }
 
 .decision-focus-open {
   align-self: stretch;
@@ -1289,6 +1303,14 @@ body {
   line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.strategy-decision-item.is-direction-summary p {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+  font-size: 11px;
+  line-height: 1.65;
 }
 
 .strategy-decision-anchor {
