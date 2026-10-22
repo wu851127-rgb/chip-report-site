@@ -1950,14 +1950,14 @@ function renderStrategy(report, historyReports = []) {
     {
       label: "最強支持",
       value: summary.support,
-      note: "目前支持主命題的主要證據，不等於趨勢保證。",
+      note: outlook.assessed ? "支持綜合方向的主要依據，不是以訊號數量投票。" : "目前支持主命題的主要證據，不等於趨勢保證。",
       tone: "neutral",
       relationGroups: ["foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short"],
     },
     {
       label: "主要衝突",
       value: summary.conflict,
-      note: "已發生的矛盾證據，與未來失效條件分開看。",
+      note: outlook.assessed ? "可能削弱綜合方向的反向線索，不等於反轉確認。" : "已發生的矛盾證據，與未來失效條件分開看。",
       tone: "risk",
       relationGroups: ["market-price", "foreign-flow", "foreign-call", "foreign-put", "retail-net"],
     },
