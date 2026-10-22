@@ -576,7 +576,11 @@ function buildPutInterpretation(report, previousReport) {
   const strictSP = complete && priceChange < 0 && bpDelta > 0 && spDelta > bpDelta;
   const settlement = isSettlementReport(report) || isSettlementReport(previousReport);
   const quantities = complete ? `BP ${formatSignedNumber(bpDelta)} 口、SP ${formatSignedNumber(spDelta)} 口。` : "缺少當日或前一交易日 BP／SP 口數或漲跌資料。";
-  if (settlement) return { label: "PUT 結算待確認", tone: "neutral", strictSP, bpDelta, spDelta, reason: `${quantities}跨結算比較可能包含到期消失與換月，不以淨額增減判定防守強弱或方向。` };
+  if (settlement) return {
+    label: strictSP ? "嚴格 SP 成立｜跨結算待驗證" : "PUT 結算待確認",
+    tone: "neutral", strictSP, bpDelta, spDelta,
+    reason: `${quantities}${strictSP ? "下跌日兩者皆增，且 SP 新增較多，嚴格 SP 的口數條件成立。" : ""}跨結算比較可能包含到期消失與換月，不以淨額增減判定防守強弱或方向，承接是否延續仍待確認。`,
+  };
   if (!complete) return { label: "PUT 資料不足", tone: "neutral", strictSP: false, bpDelta, spDelta, reason: quantities };
   if (strictSP) return { label: "嚴格 SP 成立", tone: "continuation", strictSP, bpDelta, spDelta, reason: `${quantities}下跌日兩者皆增，且 SP 新增口數大於 BP；屬承接觀察證據，不等於反轉保證。` };
   return {
