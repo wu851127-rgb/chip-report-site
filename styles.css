@@ -2309,9 +2309,26 @@ body {
 
 .option-contour-delta.is-call-rising { color: #ff8aa3; }
 .option-contour-delta.is-call-easing { color: #70dcc2; }
-.option-contour-delta.is-put-rising { color: #90a3ff; }
+.option-contour-delta.is-put-neutral { color: #b7c9df; }
 .option-contour-delta.is-put-easing,
 .option-contour-delta.is-flat { color: #aebdce; }
+
+.refresh-status:empty { display: none; }
+.refresh-status {
+  margin: 10px 0;
+  color: #b7c9df;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.refresh-status[data-state="error"] { color: #ff9caf; }
+.refresh-status[data-state="success"] { color: #70dcc2; }
+#refreshButton:disabled { cursor: wait; opacity: 0.65; }
+.signal-balance-observation {
+  margin: 12px 0 0;
+  color: #b7c9df;
+  font-size: 12px;
+  line-height: 1.7;
+}
 
 .option-contour-track {
   overflow: hidden;

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>台股盤後籌碼儀表板</title>
-    <link rel="stylesheet" href="./styles.css?v=20260922-visual-hierarchy" />
+    <link rel="stylesheet" href="./styles.css?v=20261022-signal-refresh" />
   </head>
   <body>
     <div class="shell">
@@ -30,6 +30,7 @@
             <span title="大盤動能">市</span><span title="外資期貨">期</span><span title="選擇權輪廓">權</span><span title="散戶位階">散</span>
             <em>紅強／綠弱／粉壓／灰中性</em>
           </p>
+          <p id="refreshStatus" class="refresh-status" role="status" aria-live="polite"></p>
           <label class="history-filter-label" for="historyMonthFilter">選擇月份</label>
           <select id="historyMonthFilter" class="history-month-filter"></select>
           <nav id="historyList" class="history-list"></nav>
@@ -145,6 +146,6 @@
       <p class="trend-tooltip-reading"></p>
     </aside>
 
-    <script type="module" src="./app.js?v=20261021-retail-rank-correction"></script>
+    <script type="module" src="./app.js?v=20261022-signal-refresh"></script>
   </body>
 </html>

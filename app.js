@@ -6,6 +6,9 @@ const state = {
   deskViewOverrides: null,
   historyMonth: null,
   snapshotTransitionTimer: null,
+  loadRevision: 0,
+  refreshing: false,
+  retailPosition: null,
 };
 
 const els = {
@@ -42,6 +45,7 @@ const els = {
     detail: document.querySelector("#detailView"),
   },
   refreshButton: document.querySelector("#refreshButton"),
+  refreshStatus: document.querySelector("#refreshStatus"),
   sectionTemplate: document.querySelector("#sectionTemplate"),
   cardTemplate: document.querySelector("#cardTemplate"),
   cardTooltip: document.querySelector("#cardTooltip"),
@@ -163,6 +167,17 @@ function collectAllCardsFromReport(report) {
 function getReportCardValue(report, label, { detail = false } = {}) {
   const cards = detail ? collectAllCardsFromReport(report) : collectCardsFromReport(report);
   return getCardValue(cards, label);
+}
+
+function assessRetailPosition({ longRank, shortRank, longShareRank, shortShareRank }) {
+  const high = (value) => value !== null && value !== undefined && value >= 80;
+  if (high(longRank) && high(shortRank)) return { label: "雙向口數位階偏高", tone: "risk" };
+  if (high(longShareRank)) return { label: "多單占比位階偏高", tone: "risk" };
+  if (high(longRank)) return { label: "多單口數位階偏高", tone: "risk" };
+  if (high(shortShareRank)) return { label: "空單占比位階偏高", tone: "neutral" };
+  if (high(shortRank)) return { label: "空單口數位階偏高", tone: "neutral" };
+  const complete = [longRank, shortRank, longShareRank, shortShareRank].every((value) => value !== null && value !== undefined);
+  return { label: complete ? "口數與占比位階未達高檔" : "樣本不足", tone: "neutral" };
 }
 
 function buildRetailPositionFromHistory(historyReports) {
@@ -315,20 +330,19 @@ function buildRetailPositionFromHistory(historyReports) {
   });
   const longRank = metrics[0].value;
   const shortRank = metrics[1].value;
-  const assessment = longRank !== null && shortRank !== null && longRank >= 80 && shortRank >= 80
-    ? "雙向槓桿偏高"
-    : longRank !== null && longRank >= 80
-      ? "多方擁擠"
-      : shortRank !== null && shortRank >= 80
-        ? "空方擁擠"
-        : canRank ? "未見極端擁擠" : "樣本不足";
+  const assessment = assessRetailPosition({
+    longRank, shortRank,
+    longShareRank: metrics.find((metric) => metric.key === "longShare")?.value,
+    shortShareRank: metrics.find((metric) => metric.key === "shortShare")?.value,
+  });
   return {
     window: 45,
     sampleCount: samples.length,
     minimumSamples: 20,
     basis: "小台＋微台等值口數；微台 5 口換算為 1 口小台等值。",
     rankFormula: "近45日相對位階（同值取中間排名）= (低於本日筆數 + 同值筆數 / 2) / 樣本數 x 100。",
-    assessment,
+    assessment: assessment.label,
+    assessmentTone: assessment.tone,
     metrics,
     history,
   };
@@ -503,7 +517,7 @@ function renderScPressurePanel(snapshot) {
   if (!snapshot.isUpDay) {
     const inactive = document.createElement("p");
     inactive.className = "sc-pressure-inactive";
-    inactive.textContent = "下跌日：SC 壓力百分位不評分。請優先看下方「選擇權輪廓」的 CALL 壓力是否收斂、PUT 防守是否升高，再交叉比對散戶位階。";
+    inactive.textContent = "下跌日：SC 壓力百分位不評分。請優先看下方「選擇權輪廓」的 CALL 壓力是否收斂、BP／SP 口數是否符合嚴格 SP，再交叉比對散戶位階。";
     panel.appendChild(inactive);
   } else {
     const grid = document.createElement("div");
@@ -544,6 +558,33 @@ function midrankFromValues(values, current) {
   return Math.round(((below + equal / 2) / values.length) * 1000) / 10;
 }
 
+function isSettlementReport(report) {
+  return collectAllCardsFromReport(report).some((card) => card.alertLabel === "SETTLE DAY");
+}
+
+function buildPutInterpretation(report, previousReport) {
+  const delta = (label) => {
+    const current = getReportCardValue(report, label, { detail: true });
+    const previous = getReportCardValue(previousReport, label, { detail: true });
+    return current === null || previous === null ? null : current - previous;
+  };
+  const bpDelta = delta("外資BP口數");
+  const spDelta = delta("外資SP口數");
+  const priceChange = getReportCardValue(report, "加權指數漲跌");
+  const complete = [bpDelta, spDelta, priceChange].every((value) => value !== null);
+  const strictSP = complete && priceChange < 0 && bpDelta > 0 && spDelta > bpDelta;
+  const settlement = isSettlementReport(report) || isSettlementReport(previousReport);
+  const quantities = complete ? `BP ${formatSignedNumber(bpDelta)} 口、SP ${formatSignedNumber(spDelta)} 口。` : "缺少當日或前一交易日 BP／SP 口數或漲跌資料。";
+  if (settlement) return { label: "PUT 結算待確認", tone: "neutral", strictSP, bpDelta, spDelta, reason: `${quantities}跨結算比較可能包含到期消失與換月，不以淨額增減判定防守強弱或方向。` };
+  if (!complete) return { label: "PUT 資料不足", tone: "neutral", strictSP: false, bpDelta, spDelta, reason: quantities };
+  if (strictSP) return { label: "嚴格 SP 成立", tone: "continuation", strictSP, bpDelta, spDelta, reason: `${quantities}下跌日兩者皆增，且 SP 新增口數大於 BP；屬承接觀察證據，不等於反轉保證。` };
+  return {
+    label: priceChange >= 0 ? "上漲／平盤日不判 SP" : "嚴格 SP 未成立",
+    tone: "neutral", strictSP, bpDelta, spDelta,
+    reason: `${quantities}${priceChange >= 0 ? "未符合下跌日條件。" : "未同時符合 BP、SP 皆增加且 SP 增量較大的條件。"}BP－SP 金額上升可能是買方避險需求增加，下降也可能是買方減碼或雙邊縮水，不能直接當成偏多或偏空訊號。`,
+  };
+}
+
 function buildOptionContourSnapshot(historyReports) {
   const samples = historyReports.slice(0, 45).map((report) => {
     const bc = getReportCardValue(report, "外資BC金額", { detail: true });
@@ -552,24 +593,26 @@ function buildOptionContourSnapshot(historyReports) {
     const sp = getReportCardValue(report, "外資SP金額", { detail: true });
     if ([bc, sc, bp, sp].some((value) => value === null)) return null;
     return { bc, sc, bp, sp, callPressure: sc - bc, putDefense: bp - sp };
-  }).filter(Boolean);
+  });
   const current = samples[0] ?? null;
   const previous = samples[1] ?? null;
   if (!current || !previous) return null;
+  const validSamples = samples.filter(Boolean);
 
   return {
-    sampleCount: samples.length,
+    sampleCount: validSamples.length,
     window: 45,
     callPressure: current.callPressure,
     callChange: current.callPressure - previous.callPressure,
-    callRank: midrankFromValues(samples.map((item) => item.callPressure), current.callPressure),
+    callRank: midrankFromValues(validSamples.map((item) => item.callPressure), current.callPressure),
     bcAmount: current.bc,
-    bcRank: midrankFromValues(samples.map((item) => item.bc), current.bc),
+    bcRank: midrankFromValues(validSamples.map((item) => item.bc), current.bc),
     scAmount: current.sc,
-    scRank: midrankFromValues(samples.map((item) => item.sc), current.sc),
+    scRank: midrankFromValues(validSamples.map((item) => item.sc), current.sc),
     putDefense: current.putDefense,
     putChange: current.putDefense - previous.putDefense,
-    putRank: midrankFromValues(samples.map((item) => item.putDefense), current.putDefense),
+    putRank: midrankFromValues(validSamples.map((item) => item.putDefense), current.putDefense),
+    putInterpretation: buildPutInterpretation(historyReports[0], historyReports[1]),
   };
 }
 
@@ -633,15 +676,15 @@ function buildForeignOptionHeatCell(optionSnapshot, indexChange) {
 }
 
 function changeLabel(change, side) {
-  if (change === 0) return side === "call" ? "壓力持平" : "防守持平";
+  if (change === 0) return side === "call" ? "壓力持平" : "淨防禦金額持平";
   if (side === "call") return change > 0 ? "壓力升高" : "壓力收斂";
-  return change > 0 ? "防守升高" : "防守減弱";
+  return change > 0 ? "淨防禦金額增加" : "淨防禦金額減少";
 }
 
 function changeTone(change, side) {
   if (change === 0) return "is-flat";
   if (side === "call") return change > 0 ? "is-call-rising" : "is-call-easing";
-  return change > 0 ? "is-put-rising" : "is-put-easing";
+  return "is-put-neutral";
 }
 
 function buildOptionContourMetric({ side, value, change, rank, formula }) {
@@ -654,7 +697,7 @@ function buildOptionContourMetric({ side, value, change, rank, formula }) {
   const head = document.createElement("div");
   head.className = "option-contour-metric-head";
   const label = document.createElement("span");
-  label.textContent = isCall ? "CALL 端｜上檔壓力" : "PUT 端｜下檔防守";
+  label.textContent = isCall ? "CALL 端｜上檔壓力" : "PUT 端｜淨防禦金額";
   const rankTag = document.createElement("span");
   rankTag.className = "option-contour-rank";
   rankTag.textContent = rank === null ? "樣本不足" : `${renderValue(rank, "0.0")}% 位階`;
@@ -710,7 +753,7 @@ function renderOptionContourPanel(snapshot) {
   heading.append(title, meta);
   const conclusion = document.createElement("span");
   conclusion.className = "option-contour-conclusion";
-  conclusion.textContent = `${changeLabel(snapshot.callChange, "call")}｜${changeLabel(snapshot.putChange, "put")}`;
+  conclusion.textContent = `${changeLabel(snapshot.callChange, "call")}｜${snapshot.putInterpretation.label}`;
   head.append(heading, conclusion);
   panel.appendChild(head);
 
@@ -729,19 +772,19 @@ function renderOptionContourPanel(snapshot) {
       value: snapshot.putDefense,
       change: snapshot.putChange,
       rank: snapshot.putRank,
-      formula: "PUT 端防守 = BP 金額 − SP 金額；今日增減 = 今日防守 − 前日防守。",
+      formula: "PUT 淨防禦金額 = BP 金額 − SP 金額；今日增減 = 今日淨額 − 前日淨額。金額差不代表 SP 承接訊號，須另核對口數。",
     })
   );
   panel.appendChild(grid);
 
   const interpretation = document.createElement("p");
   interpretation.className = "option-contour-interpretation";
-  interpretation.textContent = `本日輪廓：CALL 端較前日${snapshot.callChange > 0 ? "增加" : snapshot.callChange < 0 ? "減少" : "持平"} ${renderValue(Math.abs(snapshot.callChange), "#,##0")}；PUT 端較前日${snapshot.putChange > 0 ? "增加" : snapshot.putChange < 0 ? "減少" : "持平"} ${renderValue(Math.abs(snapshot.putChange), "#,##0")}。存量與增減必須一起看，不可單憑其中一側直接判定多空。`;
+  interpretation.textContent = `${snapshot.putInterpretation.label}：${snapshot.putInterpretation.reason}`;
   panel.appendChild(interpretation);
 
   panel.appendChild(buildPanelDisclosure(
     "查看輪廓口徑與色碼",
-    "CALL 端壓力＝SC 金額－BC 金額；PUT 端防守＝BP 金額－SP 金額；今日增減＝今日數值－前日數值。橘紅代表 CALL 上檔壓力、藍紫代表 PUT 下檔防守、青綠代表 CALL 壓力收斂、灰色代表持平或防守減弱。"
+    "CALL 端壓力＝SC 金額－BC 金額；PUT 淨防禦金額＝BP 金額－SP 金額；今日增減＝今日數值－前日數值。橘紅代表 CALL 壓力增加、青綠代表 CALL 壓力收斂；PUT 金額增減採中性色，不單獨推論方向。嚴格 SP 另以日漲跌與 BP／SP 口數變化判定；結算日及其後一筆比較另列待確認。"
   ));
 
 }
@@ -794,9 +837,8 @@ function buildSignalBalance(report, strategy, optionSnapshot, retailPosition) {
   if (futuresDelta !== null && futuresDelta > 0) add(continuation, futures !== null && futures < 0 ? "期貨回補" : "期貨改善", ["foreign-flow"]);
   if (futuresDelta !== null && futuresDelta < 0 && futures !== null && futures < 0) add(risk, "期貨防禦升級", ["foreign-flow"]);
   if (optionSnapshot?.callChange < 0) add(continuation, "CALL 壓力收斂", ["foreign-call"]);
-  if (optionSnapshot?.putChange > 0) add(continuation, "PUT 防守升高", ["foreign-put"]);
+  if (optionSnapshot?.putInterpretation.tone === "continuation") add(continuation, "嚴格 SP 成立", ["foreign-put"]);
   if (optionSnapshot?.callChange > 0) add(risk, "CALL 壓力升高", ["foreign-call"]);
-  if (optionSnapshot?.putChange < 0) add(risk, "PUT 防守減弱", ["foreign-put"]);
 
   const longFomo = longVelocity?.current > 0 && ((longVelocity.value ?? 0) >= 75 || (longShareRank ?? 0) >= 75);
   if (longFomo) add(risk, "多單追價升溫", ["retail-long", "retail-net"]);
@@ -856,6 +898,14 @@ function buildSignalBalance(report, strategy, optionSnapshot, retailPosition) {
     buildLane("回測風險", risk, "risk", "尚無明確升級")
   );
   panel.append(head, lanes);
+  if (optionSnapshot && optionSnapshot.putInterpretation.tone === "neutral") {
+    const observation = document.createElement("p");
+    observation.className = "signal-balance-observation";
+    observation.dataset.relationGroups = "foreign-put";
+    observation.textContent = `待確認｜${optionSnapshot.putInterpretation.label}。${optionSnapshot.putInterpretation.reason}`;
+    panel.appendChild(observation);
+    bindResearchRelationInteraction(observation);
+  }
   return panel;
 }
 
@@ -916,13 +966,13 @@ function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
   grid.appendChild(buildForeignOptionHeatCell(optionSnapshot, indexChange));
 
   const retailAssessment = retailPosition?.assessment ?? "資料不足";
-  const retailTone = retailAssessment.includes("雙向") ? "risk" : "neutral";
+  const retailTone = retailPosition?.assessmentTone ?? "neutral";
   grid.appendChild(buildPulseCell({
-    label: "散戶位階",
+    label: "散戶實際持倉占比",
     value: longShare === undefined || shortShare === undefined
       ? "—"
       : `多 ${renderValue(longShare, "0.0%")}｜空 ${renderValue(shortShare, "0.0%")}`,
-    detail: "近 45 日等值部位相對水位",
+    detail: `多單占比位階 ${renderValue(metrics.get("longShare")?.value, "0.0")}%｜近 45 日相對排名，非實際占比`,
     tone: retailTone,
     signal: retailAssessment,
     relationGroups: ["retail-long", "retail-short", "retail-net", "retail-micro"],
@@ -1612,12 +1662,12 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
   const optionContourView =
     foreignCallPressure === null || foreignPutDefense === null
       ? "CALL / PUT 輪廓資料待補。"
-      : `外資選擇權輪廓：CALL 端淨 SC 壓力 ${renderValue(foreignCallPressure, "#,##0")}，${foreignCallPressureDelta === null ? "日增減待補" : `較前日${foreignCallPressureDelta >= 0 ? "增加" : "收斂"} ${renderValue(Math.abs(foreignCallPressureDelta), "#,##0")}`}；PUT 端防守 ${renderValue(foreignPutDefense, "#,##0")}，${foreignPutDefenseDelta === null ? "日增減待補" : `較前日${foreignPutDefenseDelta >= 0 ? "升高" : "減弱"} ${renderValue(Math.abs(foreignPutDefenseDelta), "#,##0")}`}。${indexChange !== null && foreignCallPressureDelta !== null && indexChange > 0 && foreignCallPressureDelta > 0 ? "CALL 壓力與上漲同步擴張，先視為上檔對手盤與整理監測；若後續指數鈍化卻仍續增，才是需要降級的壓力。" : foreignCallPressureDelta !== null && foreignCallPressureDelta < 0 ? "CALL 壓力收斂，有利於降低上檔壓力，但仍需確認不是單日回補。" : "存量與加減碼需同步追蹤，不能只用一側部位直接定義趨勢。"}`;
+      : `外資選擇權輪廓：CALL 端淨 SC 壓力 ${renderValue(foreignCallPressure, "#,##0")}，${foreignCallPressureDelta === null ? "日增減待補" : `較前日${foreignCallPressureDelta >= 0 ? "增加" : "收斂"} ${renderValue(Math.abs(foreignCallPressureDelta), "#,##0")}`}；PUT 淨防禦金額 ${renderValue(foreignPutDefense, "#,##0")}，${foreignPutDefenseDelta === null ? "日增減待補" : `較前日${foreignPutDefenseDelta >= 0 ? "增加" : "減少"} ${renderValue(Math.abs(foreignPutDefenseDelta), "#,##0")}`}。${optionContourSnapshot?.putInterpretation.reason ?? "PUT 淨額增減不可直接替代口數訊號。"}${indexChange !== null && foreignCallPressureDelta !== null && indexChange > 0 && foreignCallPressureDelta > 0 ? "CALL 壓力與上漲同步擴張，先視為上檔對手盤與整理監測；若後續指數鈍化卻仍續增，才是需要降級的壓力。" : foreignCallPressureDelta !== null && foreignCallPressureDelta < 0 ? "CALL 壓力收斂，有利於降低上檔壓力，但仍需確認不是單日回補。" : "存量與加減碼需同步追蹤，不能只用一側部位直接定義趨勢。"}`;
   const scQualityView =
     !scPressureSnapshot
       ? "SC 壓力品質的歷史比較樣本不足，暫不以速度判斷。"
       : !scPressureSnapshot.isUpDay
-        ? `今日為下跌日，依研究規則不將 SC 速度或嚴格 SC 壓力硬套進上漲日百分位；SC 金額 ${formatSignedPercent(scPressureSnapshot.scAmountRate)}、BC 金額 ${formatSignedPercent(scPressureSnapshot.bcAmountRate)}，應改以 CALL 壓力是否收斂與 PUT 防守是否升級判讀。`
+        ? `今日為下跌日，依研究規則不將 SC 速度或嚴格 SC 壓力硬套進上漲日百分位；SC 金額 ${formatSignedPercent(scPressureSnapshot.scAmountRate)}、BC 金額 ${formatSignedPercent(scPressureSnapshot.bcAmountRate)}，應改以 CALL 壓力與 BP／SP 口數條件交叉判讀。`
         : `今日為上漲日，SC 口數日增 ${formatSignedPercent(scPressureSnapshot.scQtyRate)}，速度位階 ${scPressureSnapshot.speedRank === null ? "樣本不足" : `${renderValue(scPressureSnapshot.speedRank, "0.0")}%`}；嚴格 SC 壓力位階 ${scPressureSnapshot.strictRank === null ? "樣本不足" : `${renderValue(scPressureSnapshot.strictRank, "0.0")}%`}。${optionContourSnapshot?.callRank !== null && optionContourSnapshot?.callRank !== undefined ? `CALL 壓力存量位階 ${renderValue(optionContourSnapshot.callRank, "0.0")}%` : "CALL 壓力存量位階樣本不足"}；只有速度與壓力同時逼近極端、且 BC 由低檔加速時，才提高過熱降檔權重。`;
   const dealerRetailView = dealerShortOverheat
     ? `自營端賣方部位偏熱，自營(賣)OP 未平倉金額 ${renderValue(dealerSellOiAmount, "#,##0")}、BP/SP 增幅比例 ${dealerBpSpRatio !== null ? renderValue(dealerBpSpRatio, "0.00%") : "待補"}；若同時散戶多單下降，這通常支持先有反彈，但若外資 SP 與期貨回補延續不足，仍要把後續整理視為主情境。`
@@ -1626,17 +1676,8 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
     : dealerBuyOiAmount !== null && dealerSellOiAmount !== null
       ? `自營端買方金額 ${renderValue(dealerBuyOiAmount, "#,##0")}、賣方金額 ${renderValue(dealerSellOiAmount, "#,##0")}，買方比 ${getCardRender(cards, "自營買方買權/賣權比")}；目前更像中性偏多的配平，而非過度擴張槓桿。`
       : `自營端買權熱度目前尚未全面失控，可視為次要確認訊號；若後續與外資買權槓桿共振，才需要把短線過熱權重進一步拉高。`;
-  const retailPositionView = retailLeverageCrowded
-    ? `散戶位階顯示多方 ${renderValue(retailLongRank, "0.0")}%、空方 ${renderValue(retailShortRank, "0.0")}%，屬雙向槓桿偏高；優先防範波動放大，不可把單一位階當成方向訊號。`
-    : retailFomoLong
-      ? `散戶多單持倉占比位階 ${renderValue(retailLongShareRank, "0.0")}%、等值多單位階 ${renderValue(retailLongRank, "0.0")}%，多方部位偏擁擠；這是追價與回測風險提醒，不單獨構成偏空結論。`
-      : retailSkepticalShort
-        ? `散戶空單持倉占比位階 ${renderValue(retailShortShareRank, "0.0")}% 偏高、但多單占比未擁擠，屬市場仍有懷疑的高空單結構；價格未轉弱前可保留軋空延續的可能，但不構成追價理由。`
-        : retailCrowdedShort
-          ? `散戶等值空單位階 ${renderValue(retailShortRank, "0.0")}% 偏高；價格一旦止穩應留意軋空彈性，但不單獨構成偏多結論。`
-        : retailNetRank !== null
-          ? `散戶 45 日位階未見極端擁擠（淨多空位階 ${renderValue(retailNetRank, "0.0")}%）；結構是否延續仍以外資期貨與選擇權為主。`
-          : "散戶位階樣本尚在累積，暫不以此作為方向判斷。";
+  const retailAssessment = assessRetailPosition({ longRank: retailLongRank, shortRank: retailShortRank, longShareRank: retailLongShareRank, shortShareRank: retailShortShareRank });
+  const retailPositionView = `散戶結構：${retailAssessment.label}。多單口數位階 ${renderValue(retailLongRank, "0.0")}%、多單占比位階 ${renderValue(retailLongShareRank, "0.0")}%；兩者都是近 45 日相對排名，不是實際持倉占比，也不單獨構成方向結論。`;
   const retailView = panicWashoutSignal
     ? `散戶未平倉 ${retailNet !== null ? renderValue(retailNet, "#,##0") : "待補"}，較前日 ${retailDelta !== null ? renderValue(retailDelta, "#,##0") : "待補"}；在大跌背景下反而減少多單，代表恐慌型部位開始鬆動，較容易形成短線相對低點。若這類盤屬於波動更大、時間更長的整理段，研究上更重視「抄底後願意先縮手」這個訊號，而不是只看散戶多單是否衝到歷史高峰。${retailMicroDelta !== null ? `微台未平倉變動 ${renderValue(retailMicroDelta, "#,##0")} 也可同步觀察情緒是否退潮。` : ""} ${retailPositionView}`
     : retailChasingLong
@@ -2148,10 +2189,10 @@ function buildShortTrendPanel(historyReports) {
       reading: "壓力連續收斂才表示上檔賣方壓力減輕。下跌日應看這個淨壓力，不將上漲日 SC 百分位硬套入判讀。",
     },
     {
-      key: "putDefense", label: "PUT 防守", unit: "仟元", numFmt: "#,##0", tone: "put",
+      key: "putDefense", label: "PUT 淨防禦", unit: "仟元", numFmt: "#,##0", tone: "put",
       relationGroups: ["foreign-put"],
       formula: "外資 BP 未平倉金額 - SP 未平倉金額；即主表「外資(賣)OP未平倉金額」。",
-      reading: "防守提高代表 PUT 端結構轉強，但 SP 訊號只在下跌日、BP 與 SP 口數皆增加且 SP 增量大於 BP 時成立。",
+      reading: "淨額增減只描述 BP 與 SP 金額差，不直接表示防守轉強或減弱。嚴格 SP 須在下跌日、BP 與 SP 口數皆增加且 SP 增量大於 BP；跨結算另待確認。",
     },
     {
       key: "retailNet", label: "散戶淨部位", unit: "等值口", numFmt: "#,##0.0", tone: "retail",
@@ -2285,7 +2326,7 @@ function buildShortTrendPanel(historyReports) {
     const movementTone = definition.tone === "call"
       ? (delta > 0 ? "is-pressure" : "is-relief")
       : definition.tone === "put"
-        ? (delta > 0 ? "is-stronger" : "is-weaker")
+        ? "is-flat"
         : delta > 0 ? "is-up" : delta < 0 ? "is-down" : "is-flat";
     const row = document.createElement("article");
     row.className = `trend-strip-row trend-${definition.tone} ${movementTone}`;
@@ -2446,7 +2487,7 @@ function buildRetailPositionPanel(position) {
   head.append(title, meta);
 
   const assessment = document.createElement("div");
-  const assessmentTone = String(position.assessment ?? "").includes("擁擠") ? "is-risk" : "is-neutral";
+  const assessmentTone = position.assessmentTone === "risk" ? "is-risk" : "is-neutral";
   assessment.className = `retail-position-assessment ${assessmentTone}`;
   assessment.textContent = position.assessment ?? "樣本不足";
   head.appendChild(assessment);
@@ -2628,7 +2669,7 @@ function monthLabel(month) {
   return year && value ? `${year} 年 ${value} 月` : month;
 }
 
-function buildHistorySignalState(report, previousReport) {
+function buildHistorySignalState(report, previousReport, position = null) {
   if (!report) {
     return [
       { key: "market", tone: "neutral", label: "大盤資料載入中" },
@@ -2644,27 +2685,21 @@ function buildHistorySignalState(report, previousReport) {
   const foreignSell = getReportCardValue(report, "外資(賣)OP未平倉金額");
   const previousBuy = getReportCardValue(previousReport, "外資(買)OP未平倉金額");
   const previousSell = getReportCardValue(previousReport, "外資(賣)OP未平倉金額");
-  const retailLongRank = getReportCardValue(report, "散戶多單持倉占比位階(45日)");
-  const retailShortRank = getReportCardValue(report, "散戶空單持倉占比位階(45日)");
+  const retailAssessment = position ? { label: position.assessment, tone: position.assessmentTone } : assessRetailPosition({
+    longRank: getReportCardValue(report, "散戶多方位階(45日)"),
+    shortRank: getReportCardValue(report, "散戶空方位階(45日)"),
+    longShareRank: getReportCardValue(report, "散戶多單持倉占比位階(45日)"),
+    shortShareRank: getReportCardValue(report, "散戶空單持倉占比位階(45日)"),
+  });
 
   const optionStatus = { key: "options", tone: "neutral", label: "選擇權輪廓：等待前日交叉資料" };
   if ([foreignBuy, foreignSell, previousBuy, previousSell].every((value) => value !== null)) {
     const callPressureDelta = (-foreignBuy) - (-previousBuy);
-    const putDefenseDelta = foreignSell - previousSell;
-    if (callPressureDelta > 0 && putDefenseDelta < 0) {
-      optionStatus.tone = "risk";
-      optionStatus.label = "選擇權輪廓：CALL 壓力升高、PUT 防守減弱";
-    } else if (callPressureDelta < 0 && putDefenseDelta > 0) {
-      optionStatus.tone = "bull";
-      optionStatus.label = "選擇權輪廓：CALL 壓力舒緩、PUT 防守增強";
-    } else {
-      optionStatus.label = "選擇權輪廓：雙端訊號未同步";
-    }
+    const put = buildPutInterpretation(report, previousReport);
+    optionStatus.tone = callPressureDelta > 0 ? "risk" : callPressureDelta < 0 || put.tone === "continuation" ? "bull" : "neutral";
+    optionStatus.label = `選擇權輪廓：${changeLabel(callPressureDelta, "call")}；${put.label}`;
   }
 
-  // Keep the rail aligned with the dashboard's crowding rule: high retail long
-  // exposure is the chase-risk condition, while high short exposure is contextual.
-  const retailExtreme = retailLongRank !== null && retailLongRank >= 80;
   return [
     {
       key: "market",
@@ -2679,18 +2714,18 @@ function buildHistorySignalState(report, previousReport) {
     optionStatus,
     {
       key: "retail",
-      tone: retailExtreme ? "risk" : "neutral",
-      label: retailExtreme ? "散戶位階：多方持倉占比進入高位擁擠區" : "散戶位階：未見多方持倉占比極端擁擠",
+      tone: retailAssessment.tone,
+      label: `散戶位階：${retailAssessment.label}`,
     },
   ];
 }
 
-function buildHistoryStateRail(report, previousReport) {
+function buildHistoryStateRail(report, previousReport, position = null) {
   const rail = document.createElement("span");
   rail.className = "history-state-rail";
   rail.setAttribute("aria-hidden", "true");
 
-  for (const signal of buildHistorySignalState(report, previousReport)) {
+  for (const signal of buildHistorySignalState(report, previousReport, position)) {
     const marker = document.createElement("span");
     marker.className = `history-state-marker is-${signal.tone}`;
     marker.dataset.signal = signal.key;
@@ -2724,7 +2759,8 @@ function renderHistory(index) {
     const reportIndex = reports.findIndex((item) => item.date === report.date);
     const snapshot = state.reportCache.get(report.date);
     const previousSnapshot = reportIndex >= 0 ? state.reportCache.get(reports[reportIndex + 1]?.date) : null;
-    const signals = buildHistorySignalState(snapshot, previousSnapshot);
+    const position = report.date === state.currentDate ? state.retailPosition : null;
+    const signals = buildHistorySignalState(snapshot, previousSnapshot, position);
     const button = document.createElement("button");
     button.type = "button";
     button.className = "history-item";
@@ -2740,7 +2776,7 @@ function renderHistory(index) {
       : report.date === index.latestDate
         ? "最新快照"
         : "盤後快照";
-    button.append(date, buildHistoryStateRail(snapshot, previousSnapshot), copy);
+    button.append(date, buildHistoryStateRail(snapshot, previousSnapshot, position), copy);
     button.addEventListener("click", () => loadReport(report.date));
     els.historyList.appendChild(button);
   }
@@ -2764,15 +2800,15 @@ function renderStatus(index, currentDate) {
 }
 
 async function fetchJson(path) {
-  const response = await fetch(`${path}?t=${Date.now()}`);
+  const response = await fetch(`${path}?t=${Date.now()}`, { cache: "no-store" });
   if (!response.ok) throw new Error(`Failed to fetch ${path}`);
   return response.json();
 }
 
-async function fetchReport(date) {
-  if (state.reportCache.has(date)) return state.reportCache.get(date);
+async function fetchReport(date, cache = state.reportCache) {
+  if (cache.has(date)) return cache.get(date);
   const report = await fetchJson(`./data/reports/${date}.json`);
-  state.reportCache.set(date, report);
+  cache.set(date, report);
   return report;
 }
 
@@ -2786,43 +2822,62 @@ async function loadResearchFramework() {
   }
 }
 
-async function loadDeskViewOverrides() {
+async function loadDeskViewOverrides({ required = false } = {}) {
   try {
     return await fetchJson("./data/reports/desk-view-overrides.json");
-  } catch (_error) {
+  } catch (error) {
+    if (required) throw error;
     return {};
   }
 }
 
-async function loadHistoryReports(date, limit = 5) {
-  const dates = (state.index?.reports ?? []).map((item) => item.date);
+async function loadHistoryReports(date, limit = 5, { index = state.index, cache = state.reportCache } = {}) {
+  const dates = (index?.reports ?? []).map((item) => item.date);
   const start = dates.indexOf(date);
   if (start === -1) return [];
   const slice = dates.slice(start, start + limit);
-  return Promise.all(slice.map((itemDate) => fetchReport(itemDate)));
+  return Promise.all(slice.map((itemDate) => fetchReport(itemDate, cache)));
 }
 
-async function loadIndex() {
-  [state.researchFramework, state.deskViewOverrides] = await Promise.all([
+async function loadIndex({ refresh = false } = {}) {
+  const revision = ++state.loadRevision;
+  const cache = refresh ? new Map() : state.reportCache;
+  const [framework, overrides, index] = await Promise.all([
     loadResearchFramework(),
-    loadDeskViewOverrides(),
+    loadDeskViewOverrides({ required: refresh }),
+    fetchJson("./data/reports/index.json"),
   ]);
-  state.index = await fetchJson("./data/reports/index.json");
+  if (!index.latestDate || !Array.isArray(index.reports) || !index.reports.some((item) => item.date === index.latestDate)) {
+    throw new Error("Report index is incomplete");
+  }
   const dateFromQuery = new URLSearchParams(window.location.search).get("date");
-  state.currentDate = dateFromQuery || state.index.latestDate;
-  renderStatus(state.index, state.currentDate);
-  renderHistory(state.index);
-  if (state.currentDate) await loadReport(state.currentDate, false);
+  const preferred = refresh
+    ? state.currentDate === state.index?.latestDate ? index.latestDate : state.currentDate
+    : dateFromQuery;
+  const date = index.reports?.some((item) => item.date === preferred) ? preferred : index.latestDate;
+  // Stage refreshed history separately; failed or older requests cannot poison
+  // the displayed snapshot or the new generation's cache.
+  if (date) await loadHistoryReports(date, 46, { index, cache });
+  if (revision !== state.loadRevision) return false;
+  state.index = index;
+  state.researchFramework = framework;
+  state.deskViewOverrides = overrides;
+  state.reportCache = cache;
+  if (date) await loadReport(date, refresh && date !== state.currentDate, { revision, index, cache });
+  return revision === state.loadRevision;
 }
 
-async function loadReport(date, updateQuery = true) {
+async function loadReport(date, updateQuery = true, { revision = ++state.loadRevision, index = state.index, cache = state.reportCache } = {}) {
   const shouldAnimateSnapshot = state.currentDate !== null && state.currentDate !== date;
   if (shouldAnimateSnapshot) startSnapshotTransition();
+  else cancelSnapshotTransition();
 
   try {
-  const report = await fetchReport(date);
-  const historyReports = await loadHistoryReports(date, 46);
+  const report = await fetchReport(date, cache);
+  const historyReports = await loadHistoryReports(date, 46, { index, cache });
+  if (revision !== state.loadRevision) return;
   const retailPosition = buildRetailPositionFromHistory(historyReports);
+  state.retailPosition = retailPosition;
   const dashboardSections = (report.dashboard.sections ?? []).map((section) => {
     if (section.title !== "散戶") return section;
     return { ...section, retailPosition };
@@ -2855,7 +2910,7 @@ async function loadReport(date, updateQuery = true) {
   renderHistory(state.index);
   if (shouldAnimateSnapshot) finishSnapshotTransition();
   } catch (error) {
-    if (shouldAnimateSnapshot) cancelSnapshotTransition();
+    if (shouldAnimateSnapshot && revision === state.loadRevision) cancelSnapshotTransition();
     throw error;
   }
 }
@@ -2930,9 +2985,30 @@ function setHistoryCollapsed(collapsed) {
   els.historyToggleButton.textContent = collapsed ? "展開" : "收合";
 }
 
-els.refreshButton.addEventListener("click", async () => {
-  await loadIndex();
-});
+async function refreshReports() {
+  if (state.refreshing) return;
+  state.refreshing = true;
+  els.refreshButton.disabled = true;
+  els.refreshButton.textContent = "更新中…";
+  els.refreshButton.setAttribute("aria-busy", "true");
+  els.refreshStatus.dataset.state = "loading";
+  els.refreshStatus.textContent = "重新取得報告、歷史資料與解讀…";
+  try {
+    const updated = await loadIndex({ refresh: true });
+    els.refreshStatus.dataset.state = updated ? "success" : "idle";
+    els.refreshStatus.textContent = updated ? "已重新載入，包含同日更正。" : "已切換日期，請再次更新。";
+  } catch (_error) {
+    els.refreshStatus.dataset.state = "error";
+    els.refreshStatus.textContent = "更新失敗，請檢查連線後重試；尚未取得完整新資料。";
+  } finally {
+    state.refreshing = false;
+    els.refreshButton.disabled = false;
+    els.refreshButton.textContent = "更新";
+    els.refreshButton.setAttribute("aria-busy", "false");
+  }
+}
+
+els.refreshButton.addEventListener("click", refreshReports);
 
 bindTabs();
 els.tabs.forEach((tab) => tab.setAttribute("aria-selected", String(tab.classList.contains("is-active"))));
