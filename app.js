@@ -9,6 +9,7 @@ const state = {
   loadRevision: 0,
   refreshing: false,
   retailPosition: null,
+  failedDate: null,
 };
 
 const els = {
@@ -46,6 +47,7 @@ const els = {
   },
   refreshButton: document.querySelector("#refreshButton"),
   refreshStatus: document.querySelector("#refreshStatus"),
+  retryReportButton: document.querySelector("#retryReportButton"),
   sectionTemplate: document.querySelector("#sectionTemplate"),
   cardTemplate: document.querySelector("#cardTemplate"),
   cardTooltip: document.querySelector("#cardTooltip"),
@@ -60,16 +62,15 @@ function countDecimalsFromFormat(numFmt) {
 function renderValue(value, numFmt = "") {
   if (value === null || value === undefined) return "—";
   if (typeof value === "number") {
-    if (numFmt.includes("%")) {
-      const decimals = countDecimalsFromFormat(numFmt);
-      return `${(value * 100).toLocaleString("zh-TW", {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals,
-      })}%`;
-    }
-    return Number.isInteger(value)
-      ? value.toLocaleString("zh-TW")
-      : value.toLocaleString("zh-TW", { maximumFractionDigits: 6 });
+    if (!Number.isFinite(value)) return "—";
+    const percent = numFmt.includes("%");
+    const digits = numFmt.match(/0(?:\.([0#]+))?/);
+    const fraction = digits?.[1] ?? "";
+    const minimumFractionDigits = digits ? fraction.replaceAll("#", "").length : 0;
+    const maximumFractionDigits = digits ? fraction.length : 6;
+    const scaled = percent ? value * 100 : value;
+    const normalized = Math.abs(scaled) < 0.5 * 10 ** -maximumFractionDigits ? 0 : scaled;
+    return `${normalized.toLocaleString("zh-TW", { minimumFractionDigits, maximumFractionDigits })}${percent ? "%" : ""}`;
   }
   return String(value);
 }
@@ -796,6 +797,21 @@ function firstSentence(value, fallback = "—") {
   return match ? match[0] : text;
 }
 
+function buildDecisionSummary(strategy) {
+  const blocks = new Map((strategy.blocks ?? []).map((block) => [block.label, block]));
+  const explicit = strategy.summary ?? {};
+  const fromBlock = (label, fallback) => firstSentence(blocks.get(label)?.text, fallback);
+  return {
+    conclusion: explicit.conclusion || fromBlock("主命題", strategy.flag || strategy.toneLabel || "盤勢結構待確認"),
+    support: explicit.support || fromBlock("支持證據", "本日未另列支持證據。"),
+    conflict: explicit.conflict || fromBlock("反證風險", "本日未另列主要衝突。"),
+    pace: explicit.pace || fromBlock("部位節奏", "依結構分段處理。"),
+    validation: explicit.validation || fromBlock("驗證重點", "等待下一個驗證條件。"),
+    invalidation: explicit.invalidation || blocks.get("失效條件")?.text || "本日未另列明確失效條件；請展開完整判讀與驗證重點。",
+    hasInvalidation: Boolean(explicit.invalidation || blocks.get("失效條件")?.text),
+  };
+}
+
 function buildPulseCell({ label, value, detail, tone = "neutral", signal = "", relationGroups = [] }) {
   const item = document.createElement("article");
   item.className = `market-pulse-cell tone-${tone}`;
@@ -982,10 +998,7 @@ function buildMarketPulse(report, strategy, optionSnapshot, retailPosition) {
 }
 
 function buildDecisionFocus(report, strategy) {
-  const blocks = new Map((strategy.blocks ?? []).map((block) => [block.label, block]));
-  const theme = strategy.flag || firstSentence(blocks.get("主命題")?.text, "盤勢結構判讀");
-  const action = firstSentence(blocks.get("部位節奏")?.text, "依結構分段處理");
-  const validation = firstSentence(blocks.get("驗證重點")?.text, "等待下一個驗證條件");
+  const summary = buildDecisionSummary(strategy);
   const panel = els.decisionFocus;
   panel.replaceChildren();
   panel.hidden = false;
@@ -1004,7 +1017,7 @@ function buildDecisionFocus(report, strategy) {
   const thesisLabel = document.createElement("span");
   thesisLabel.textContent = "當日結論";
   const thesisValue = document.createElement("strong");
-  thesisValue.textContent = `${theme} · ${strategy.toneLabel}`;
+  thesisValue.textContent = summary.conclusion;
   thesis.append(thesisLabel, thesisValue);
 
   const actionItem = document.createElement("div");
@@ -1012,7 +1025,7 @@ function buildDecisionFocus(report, strategy) {
   const actionLabel = document.createElement("span");
   actionLabel.textContent = "部位節奏";
   const actionValue = document.createElement("p");
-  actionValue.textContent = action;
+  actionValue.textContent = summary.pace;
   actionItem.append(actionLabel, actionValue);
 
   const validationItem = document.createElement("div");
@@ -1020,7 +1033,7 @@ function buildDecisionFocus(report, strategy) {
   const validationLabel = document.createElement("span");
   validationLabel.textContent = "下一個驗證";
   const validationValue = document.createElement("p");
-  validationValue.textContent = validation;
+  validationValue.textContent = summary.validation;
   validationItem.append(validationLabel, validationValue);
 
   const openDesk = document.createElement("button");
@@ -1880,37 +1893,38 @@ function renderStrategy(report, historyReports = []) {
     els.strategyFlag.hidden = true;
     els.strategyFlag.textContent = "";
   }
+  els.strategyTone.hidden = Boolean(strategy.flag && strategy.flag === strategy.toneLabel);
   els.strategyTone.textContent = strategy.toneLabel;
   els.strategyTone.className = `strategy-tone tone-${strategy.tone}`;
   const blocks = strategy.blocks ?? [{ label: "Desk View", text: strategy.body }];
-  const blockByLabel = new Map(blocks.map((block) => [block.label, block]));
+  const summary = buildDecisionSummary(strategy);
   const decisionItems = [
     {
-      label: "主命題",
-      value: strategy.flag || firstSentence(blockByLabel.get("主命題")?.text, "盤勢結構判讀"),
-      note: strategy.flag ? firstSentence(blockByLabel.get("主命題")?.text) : "以今日籌碼結構定位",
+      label: "核心判讀",
+      value: summary.conclusion,
+      note: "結論先行；完整條件保留於下方判讀。",
       tone: strategy.tone,
       relationGroups: ["market-price", "foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short"],
     },
     {
-      label: "方向結論",
-      value: strategy.toneLabel,
-      note: "訊號不是單日預測，需搭配下方條件驗證。",
-      tone: strategy.tone,
+      label: "最強支持",
+      value: summary.support,
+      note: "目前支持主命題的主要證據，不等於趨勢保證。",
+      tone: "neutral",
       relationGroups: ["foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short"],
     },
     {
-      label: "部位節奏",
-      value: firstSentence(blockByLabel.get("部位節奏")?.text, "依結構分段處理"),
-      note: "先設定條件，再決定加碼或降檔。",
-      tone: "neutral",
+      label: "主要衝突",
+      value: summary.conflict,
+      note: "已發生的矛盾證據，與未來失效條件分開看。",
+      tone: "risk",
       relationGroups: ["market-price", "foreign-flow", "foreign-call", "foreign-put", "retail-net"],
     },
     {
       label: "失效條件",
-      value: firstSentence(blockByLabel.get("反證風險")?.text, "持續追蹤反證風險"),
-      note: "若失效，應優先收斂風險，不以單一數值硬拗。",
-      tone: "risk",
+      value: summary.invalidation,
+      note: summary.hasInvalidation ? "條件發生時撤回或降級原判斷。" : "未提供時明確留白，不從風險段落猜測。",
+      tone: summary.hasInvalidation ? "risk" : "neutral",
       relationGroups: ["foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short", "retail-net"],
     },
   ];
@@ -2173,13 +2187,13 @@ function buildShortTrendPanel(historyReports) {
     {
       key: "index", label: "加權指數", unit: "點", numFmt: "#,##0.00", tone: "market",
       relationGroups: ["market-price"],
-      formula: "TWSE MI_INDEX 收盤指數；5D 差額 = 當日收盤 - 五個交易日前收盤。",
+      formula: "TWSE MI_INDEX 收盤指數；區間差額 = 本視窗末日收盤 - 首日收盤；起訖日期見圖上說明。",
       reading: "價格是結構背景，不是單獨訊號。需與期貨、CALL／PUT 與散戶是否同向或背離一起看。",
     },
     {
       key: "futures", label: "外資期貨", unit: "口", numFmt: "#,##0", tone: "futures",
       relationGroups: ["foreign-flow"],
-      formula: "外資 TXF 淨額 + MXF 淨額 / 4 + TMF 淨額 / 20，四捨五入為小台等值口數。",
+      formula: "外資 TXF 淨額 + MXF 淨額 / 4 + TMF 淨額 / 20，主表四捨五入顯示大台等值口數；散戶小台＋微台／5 則是小台等值，不可混用。",
       reading: "下跌時若外資期貨逆勢回補且能延續，才提高低點測試權重；若與指數同向變化，優先視為整理訊號。",
     },
     {
@@ -2221,7 +2235,7 @@ function buildShortTrendPanel(historyReports) {
   panel.appendChild(legend);
   const dateRail = document.createElement("div");
   dateRail.className = "trend-strip-date-rail";
-  dateRail.setAttribute("aria-label", "五日交易日節點");
+  dateRail.setAttribute("aria-label", `${rawSamples.length} 筆交易日節點`);
   panel.appendChild(dateRail);
   const compareBar = document.createElement("div");
   compareBar.className = "trend-strip-compare-bar";
@@ -2257,7 +2271,7 @@ function buildShortTrendPanel(historyReports) {
     compareBar.classList.toggle("is-active", isComparing);
     compareCopy.textContent = isComparing
       ? `基準 ${baseline.date.slice(5).replace("-", "/")}｜目前 ${current.date.slice(5).replace("-", "/")}｜右側為相對基準差異`
-      : "點選一個日期節點，固定為比較基準日";
+      : `視窗 ${rawSamples[0].date.slice(5)} → ${rawSamples.at(-1).date.slice(5)}｜${rawSamples.length} 筆快照、${rawSamples.length - 1} 個交易間隔；點選日期可固定比較基準`;
     clearCompare.hidden = !isComparing;
     dateNodes.forEach((node, index) => node.classList.toggle("is-reference", index === comparisonIndex));
     refs.forEach((ref) => {
@@ -2274,7 +2288,7 @@ function buildShortTrendPanel(historyReports) {
     if (nextIndex === activeIndex) return false;
     activeIndex = nextIndex;
     const sample = rawSamples[activeIndex] ?? rawSamples.at(-1);
-    selectedDate.textContent = `${sample.date}｜五日節點交叉比對`;
+    selectedDate.textContent = `${sample.date}｜${rawSamples.length} 日節點交叉比對`;
     dateNodes.forEach((node, index) => {
       const isSelected = index === activeIndex;
       node.classList.toggle("is-selected", isSelected);
@@ -2320,10 +2334,10 @@ function buildShortTrendPanel(historyReports) {
   for (const definition of definitions) {
     const values = rawSamples.map((sample) => sample[definition.key]);
     const numeric = values.filter((value) => value !== null);
-    const first = numeric[0];
-    const latest = numeric.at(-1);
-    const delta = latest - first;
-    const movementTone = definition.tone === "call"
+    const first = values[0];
+    const latest = values.at(-1);
+    const delta = first === null || latest === null ? null : latest - first;
+    const movementTone = delta === null || delta === 0 ? "is-flat" : definition.tone === "call"
       ? (delta > 0 ? "is-pressure" : "is-relief")
       : definition.tone === "put"
         ? "is-flat"
@@ -2405,8 +2419,9 @@ function buildShortTrendPanel(historyReports) {
     });
     const change = document.createElement("span");
     change.className = "trend-strip-change";
-    const defaultChange = `5D ${formatChange(delta, definition.numFmt)}`;
+    const defaultChange = delta === null ? "區間資料不足" : `區間 Δ ${formatChange(delta, definition.numFmt)}`;
     change.textContent = defaultChange;
+    change.title = `${rawSamples[0].date} 至 ${rawSamples.at(-1).date}，末日減首日；不以其他有效日替代缺少的端點。`;
     const unit = document.createElement("small");
     unit.textContent = definition.unit;
     const copy = document.createElement("div");
@@ -2777,7 +2792,7 @@ function renderHistory(index) {
         ? "最新快照"
         : "盤後快照";
     button.append(date, buildHistoryStateRail(snapshot, previousSnapshot, position), copy);
-    button.addEventListener("click", () => loadReport(report.date));
+    button.addEventListener("click", () => selectReport(report.date));
     els.historyList.appendChild(button);
   }
 }
@@ -2808,6 +2823,7 @@ async function fetchJson(path) {
 async function fetchReport(date, cache = state.reportCache) {
   if (cache.has(date)) return cache.get(date);
   const report = await fetchJson(`./data/reports/${date}.json`);
+  if (report?.date !== date) throw new Error(`Report date mismatch: ${date}`);
   cache.set(date, report);
   return report;
 }
@@ -2915,6 +2931,28 @@ async function loadReport(date, updateQuery = true, { revision = ++state.loadRev
   }
 }
 
+async function selectReport(date) {
+  const revision = state.loadRevision + 1;
+  state.failedDate = null;
+  els.retryReportButton.hidden = true;
+  els.refreshStatus.dataset.state = "loading";
+  els.refreshStatus.textContent = `正在切換至 ${date}…`;
+  try {
+    await loadReport(date);
+    if (revision !== state.loadRevision) return false;
+    els.refreshStatus.dataset.state = "success";
+    els.refreshStatus.textContent = `目前檢視 ${date}。`;
+    return true;
+  } catch (_error) {
+    if (revision !== state.loadRevision) return false;
+    state.failedDate = date;
+    els.retryReportButton.hidden = false;
+    els.refreshStatus.dataset.state = "error";
+    els.refreshStatus.textContent = `${date} 載入失敗，保留原畫面；可重試此日期。`;
+    return false;
+  }
+}
+
 function startSnapshotTransition() {
   if (!els.content) return;
   if (state.snapshotTransitionTimer) window.clearTimeout(state.snapshotTransitionTimer);
@@ -2988,6 +3026,8 @@ function setHistoryCollapsed(collapsed) {
 async function refreshReports() {
   if (state.refreshing) return;
   state.refreshing = true;
+  state.failedDate = null;
+  els.retryReportButton.hidden = true;
   els.refreshButton.disabled = true;
   els.refreshButton.textContent = "更新中…";
   els.refreshButton.setAttribute("aria-busy", "true");
@@ -3009,6 +3049,9 @@ async function refreshReports() {
 }
 
 els.refreshButton.addEventListener("click", refreshReports);
+els.retryReportButton.addEventListener("click", () => {
+  if (state.failedDate) selectReport(state.failedDate);
+});
 
 bindTabs();
 els.tabs.forEach((tab) => tab.setAttribute("aria-selected", String(tab.classList.contains("is-active"))));
@@ -3021,7 +3064,7 @@ els.historyLatestButton.addEventListener("click", () => {
   const latestDate = state.index?.latestDate;
   if (!latestDate) return;
   state.historyMonth = dateMonth(latestDate);
-  loadReport(latestDate);
+  selectReport(latestDate);
 });
 
 els.historyToggleButton.addEventListener("click", () => {

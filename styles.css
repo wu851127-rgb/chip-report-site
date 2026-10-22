@@ -817,14 +817,12 @@ body {
 
 .decision-focus-item strong,
 .decision-focus-item p {
-  display: -webkit-box;
-  overflow: hidden;
+  display: block;
   margin: 0;
   color: #dbe5ef;
   font-size: 10px;
   line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .decision-focus-thesis strong {
@@ -1244,7 +1242,7 @@ body {
 
 .strategy-decision {
   display: grid;
-  grid-template-columns: 1.05fr 0.7fr 1.35fr 1.35fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -1269,15 +1267,13 @@ body {
 }
 
 .strategy-decision-item strong {
-  display: -webkit-box;
-  overflow: hidden;
+  display: block;
   margin-top: 6px;
   color: var(--text);
   font-size: 13px;
   line-height: 1.45;
   font-weight: 800;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .strategy-decision-item.tone-bull strong { color: #ffb1ae; }
@@ -1423,6 +1419,8 @@ body {
   transform-origin: center;
   transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
 }
+
+.strategy-tone[hidden], .strategy-flag[hidden] { display: none; }
 
 .strategy-tone.tone-bull {
   background: rgba(255, 91, 87, 0.12);
@@ -2323,6 +2321,15 @@ body {
 .refresh-status[data-state="error"] { color: #ff9caf; }
 .refresh-status[data-state="success"] { color: #70dcc2; }
 #refreshButton:disabled { cursor: wait; opacity: 0.65; }
+.report-retry-button {
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 156, 175, 0.45);
+  background: transparent;
+  color: #ffb3c5;
+  cursor: pointer;
+  font: 700 11px var(--mono);
+}
+.report-retry-button:focus-visible { outline: 2px solid var(--structure); outline-offset: 3px; }
 .signal-balance-observation {
   margin: 12px 0 0;
   color: #b7c9df;
@@ -2677,9 +2684,7 @@ body {
     grid-template-columns: 104px minmax(160px, 1fr) minmax(190px, 1.5fr) auto;
   }
 
-  .decision-focus-item:nth-of-type(4) {
-    display: none;
-  }
+  .decision-focus-item:nth-of-type(4) { display: grid; grid-column: 2 / 4; }
 
   .card-primary {
     grid-column: span 1;
@@ -2800,6 +2805,7 @@ body {
 
   .decision-focus-item:nth-of-type(4) {
     display: grid;
+    grid-column: auto;
   }
 
   .decision-focus-open {

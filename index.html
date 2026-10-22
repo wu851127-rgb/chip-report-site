@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>台股盤後籌碼儀表板</title>
-    <link rel="stylesheet" href="./styles.css?v=20261022-signal-refresh" />
+    <link rel="stylesheet" href="./styles.css?v=20261022-decision-precision" />
   </head>
   <body>
     <div class="shell">
@@ -31,6 +31,7 @@
             <em>紅強／綠弱／粉壓／灰中性</em>
           </p>
           <p id="refreshStatus" class="refresh-status" role="status" aria-live="polite"></p>
+          <button id="retryReportButton" class="report-retry-button" type="button" hidden>重試日期載入</button>
           <label class="history-filter-label" for="historyMonthFilter">選擇月份</label>
           <select id="historyMonthFilter" class="history-month-filter"></select>
           <nav id="historyList" class="history-list"></nav>
@@ -146,6 +147,6 @@
       <p class="trend-tooltip-reading"></p>
     </aside>
 
-    <script type="module" src="./app.js?v=20261022-signal-refresh"></script>
+    <script type="module" src="./app.js?v=20261022-decision-precision"></script>
   </body>
 </html>
