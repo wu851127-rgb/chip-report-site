@@ -32,6 +32,8 @@ const els = {
   strategyFlag: document.querySelector("#strategyFlag"),
   strategyTone: document.querySelector("#strategyTone"),
   strategyDecision: document.querySelector("#strategyDecision"),
+  strategyContext: document.querySelector("#strategyContext"),
+  strategyDailyChange: document.querySelector("#strategyDailyChange"),
   strategyBody: document.querySelector("#strategyBody"),
   strategyDetails: document.querySelector("#strategyDetails"),
   marketPulse: document.querySelector("#marketPulse"),
@@ -806,7 +808,7 @@ function buildDirectionalOutlook(strategy, reportDate = null) {
   const directions = {
     bullish: { label: "短線偏多", tone: "bull" },
     bearish: { label: "短線偏空", tone: "bear" },
-    neutral: { label: "中性震盪", tone: "neutral" },
+    neutral: { label: "中性觀察", tone: "neutral" },
   };
   const nonempty = (value) => typeof value === "string" && value.trim().length > 0;
   const direction = Object.hasOwn(directions, outlook?.bias) ? directions[outlook.bias] : null;
@@ -832,7 +834,11 @@ function buildDecisionSummary(strategy, reportDate = null) {
   const blocks = new Map((strategy.blocks ?? []).map((block) => [block.label, block]));
   const explicit = strategy.summary ?? {};
   const fromBlock = (label, fallback) => firstSentence(blocks.get(label)?.text, fallback);
+  const archetype = explicit.archetype || strategy.flag
+    || blocks.get("主命題")?.text?.match(/過熱降檔|整理吸納|跌深低點|低點測試|修復觀察|背離布局|平衡確認|恐慌釋放/)?.[0]
+    || "情境待確認";
   return {
+    archetype,
     conclusion: explicit.conclusion || fromBlock("主命題", strategy.flag || strategy.toneLabel || "盤勢結構待確認"),
     support: explicit.support || fromBlock("支持證據", "本日未另列支持證據。"),
     conflict: explicit.conflict || fromBlock("反證風險", "本日未另列主要衝突。"),
@@ -842,6 +848,97 @@ function buildDecisionSummary(strategy, reportDate = null) {
     hasInvalidation: Boolean(explicit.invalidation || blocks.get("失效條件")?.text),
     outlook: buildDirectionalOutlook(strategy, reportDate),
   };
+}
+
+function buildDailyDeskChange(report, historyReports, strategy, overrides = {}, reportIndex = null) {
+  const current = report.date;
+  const priorDates = (reportIndex?.reports ?? historyReports)
+    .map((item) => item.date).filter((date) => date < current).sort().reverse();
+  const previousDate = priorDates[0] ?? null;
+  const previous = historyReports.find((item) => item.date === previousDate);
+  const outlook = buildDirectionalOutlook(strategy, current);
+  const previousOutlook = buildDirectionalOutlook(overrides[previousDate] ?? {}, previousDate);
+  const assessment = !previous
+    ? "沒有相鄰快照可比較，不推論方向升降級。"
+    : !outlook.assessed || !previousOutlook.assessed
+      ? "至少一日未另作方向評估；不以數值變化補猜方向。"
+      : outlook.bias === previousOutlook.bias
+        ? `綜合方向維持${outlook.label}｜${outlook.qualifier}。`
+        : `綜合方向由${previousOutlook.label}調整為${outlook.label}｜${outlook.qualifier}。`;
+  if (!previous) return {
+    available: false, previousDate, facts: [], assessment,
+    note: previousDate ? `前一交易日 ${previousDate} 快照未載入，不改用更早日期。` : "首筆快照，尚無前一交易日可比較。",
+  };
+
+  const facts = [];
+  const difference = (label, detail = false) => {
+    const now = getReportCardValue(report, label, { detail });
+    const before = getReportCardValue(previous, label, { detail });
+    return now === null || before === null ? null : now - before;
+  };
+  const price = difference("加權指數");
+  facts.push(price === null ? "指數資料不足" : `指數 ${formatSignedNumber(price, 2)} 點`);
+  const futures = difference("外資(大小台)期貨未平倉");
+  facts.push(futures === null ? "期貨資料不足" : `期貨淨額 ${formatSignedNumber(futures)} 口`);
+  const bc = difference("外資BC金額", true);
+  const sc = difference("外資SC金額", true);
+  facts.push(bc === null || sc === null ? "CALL 資料不足" : `CALL 壓力差 ${formatSignedNumber(sc - bc)} 仟元`);
+  const share = (item) => {
+    const values = ["散戶看多", "散戶看空", "微台散戶看多", "微台散戶看空"]
+      .map((label) => getReportCardValue(item, label));
+    if (values.some((value) => value === null)) return null;
+    const [long, short, microLong, microShort] = values;
+    const total = long * 5 + short * 5 + microLong + microShort;
+    return total > 0 ? (long * 5 + microLong) / total : null;
+  };
+  const nowShare = share(report);
+  const beforeShare = share(previous);
+  facts.push(nowShare === null || beforeShare === null ? "多單占比資料不足"
+    : `多單實際占比 ${formatSignedNumber((nowShare - beforeShare) * 100, 2)} 個百分點`);
+  const settlement = isSettlementReport(report) || isSettlementReport(previous);
+  const put = buildPutInterpretation(report, previous);
+  const caveats = [];
+  if (settlement) caveats.push("跨結算：部位差可能含到期與換月，不直接代表新增或撤退");
+  if (outlook.reviewType === "retrospective" || previousOutlook.reviewType === "retrospective") {
+    caveats.push("方向對照含歷史重評，非當時即時預測");
+  }
+  return {
+    available: true, previousDate, facts, assessment,
+    note: `${put.label}。${caveats.length ? `${caveats.join("；")}。` : ""}數值差不自動決定多空；下一驗證見部位節奏與完整判讀。`,
+  };
+}
+
+function renderDeskContext(report, strategy, historyReports) {
+  const summary = buildDecisionSummary(strategy, report.date);
+  els.strategyContext.replaceChildren();
+  for (const [label, value] of [["盤勢主命題", summary.archetype], ["部位節奏", summary.pace]]) {
+    const item = document.createElement("div");
+    const name = document.createElement("span");
+    name.textContent = label;
+    const text = document.createElement("p");
+    text.textContent = value;
+    item.append(name, text);
+    els.strategyContext.appendChild(item);
+  }
+  const change = buildDailyDeskChange(report, historyReports, strategy, state.deskViewOverrides ?? {}, state.index);
+  const panel = els.strategyDailyChange;
+  panel.replaceChildren();
+  const heading = document.createElement("h3");
+  heading.textContent = change.available ? `今日變化｜相較 ${change.previousDate}` : "今日變化｜暫無相鄰快照";
+  const assessment = document.createElement("p");
+  assessment.className = "desk-change-assessment";
+  assessment.textContent = change.assessment;
+  panel.append(heading, assessment);
+  if (change.facts.length) {
+    const facts = document.createElement("p");
+    facts.className = "desk-change-facts";
+    facts.textContent = change.facts.join("；") + "。";
+    panel.appendChild(facts);
+  }
+  const note = document.createElement("p");
+  note.className = "desk-change-note";
+  note.textContent = change.note;
+  panel.appendChild(note);
 }
 
 function buildPulseCell({ label, value, detail, tone = "neutral", signal = "", relationGroups = [] }) {
@@ -1049,7 +1146,7 @@ function buildDecisionFocus(report, strategy) {
   const thesis = document.createElement("div");
   thesis.className = "decision-focus-item decision-focus-thesis";
   const thesisLabel = document.createElement("span");
-  thesisLabel.textContent = "當日結論";
+  thesisLabel.textContent = "綜合方向";
   const thesisValue = document.createElement("strong");
   thesisValue.className = "decision-direction-label";
   thesisValue.textContent = outlook.assessed ? `${outlook.label}｜${outlook.qualifier}` : outlook.label;
@@ -1926,25 +2023,18 @@ function renderStrategy(report, historyReports = []) {
     : calculatedStrategy;
   els.strategyPanel.hidden = false;
   els.strategyPanel.classList.remove("tone-bull", "tone-bear", "tone-risk", "tone-neutral");
-  els.strategyPanel.classList.add(`tone-${strategy.tone}`);
-  if (strategy.flag) {
-    els.strategyFlag.hidden = false;
-    els.strategyFlag.textContent = strategy.flag;
-  } else {
-    els.strategyFlag.hidden = true;
-    els.strategyFlag.textContent = "";
-  }
-  els.strategyTone.hidden = Boolean(strategy.flag && strategy.flag === strategy.toneLabel);
-  els.strategyTone.textContent = strategy.toneLabel;
-  els.strategyTone.className = `strategy-tone tone-${strategy.tone}`;
+  // Context stays neutral; direction and risk have their own explicitly labeled cards.
+  els.strategyFlag.hidden = true;
+  els.strategyTone.hidden = true;
+  renderDeskContext(report, strategy, historyReports);
   const blocks = strategy.blocks ?? [{ label: "Desk View", text: strategy.body }];
   const summary = buildDecisionSummary(strategy, report.date);
   const outlook = summary.outlook;
   const decisionItems = [
     {
-      label: "核心判讀",
+      label: "綜合方向",
       value: outlook.assessed ? `${outlook.label}｜${outlook.qualifier}` : summary.conclusion,
-      note: outlook.assessed ? outlook.reason : "方向未評估；結構定位不等於多空方向。",
+      note: outlook.assessed ? `${outlook.reason}${outlook.bias === "neutral" ? " 中性代表證據未選邊，不預測低波動。" : ""}` : "方向未評估；結構定位不等於多空方向。",
       tone: outlook.tone,
       outlook,
       relationGroups: ["market-price", "foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short"],
@@ -1957,9 +2047,9 @@ function renderStrategy(report, historyReports = []) {
       relationGroups: ["foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short"],
     },
     {
-      label: "主要衝突",
+      label: "主要風險",
       value: summary.conflict,
-      note: outlook.assessed ? "可能削弱綜合方向的反向線索，不等於反轉確認。" : "已發生的矛盾證據，與未來失效條件分開看。",
+      note: "可能使綜合方向失準的反向證據與可比性限制；不是另一個多空方向，也不是部位指令。",
       tone: "risk",
       relationGroups: ["market-price", "foreign-flow", "foreign-call", "foreign-put", "retail-net"],
     },

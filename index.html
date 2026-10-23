@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>台股盤後籌碼儀表板</title>
-    <link rel="stylesheet" href="./styles.css?v=20261023-historical-outlooks" />
+    <link rel="stylesheet" href="./styles.css?v=20261023-desk-context-change" />
   </head>
   <body>
     <div class="shell">
@@ -81,8 +81,10 @@
                 <span id="strategyTone" class="strategy-tone">中性</span>
               </div>
             </div>
-            <p class="strategy-read-order">先看結論與節奏，再以底下資料驗證。</p>
+            <p class="strategy-read-order">情境不等於方向，風險不等於部位指令；先看各層判讀，再核對今日變化。</p>
+            <div id="strategyContext" class="strategy-context"></div>
             <div id="strategyDecision" class="strategy-decision"></div>
+            <section id="strategyDailyChange" class="desk-daily-change" aria-label="相較前一交易日的變化"></section>
             <details id="strategyDetails" class="strategy-details">
               <summary>
                 <span>完整判讀與證據</span>
@@ -147,6 +149,6 @@
       <p class="trend-tooltip-reading"></p>
     </aside>
 
-    <script type="module" src="./app.js?v=20261023-historical-outlooks"></script>
+    <script type="module" src="./app.js?v=20261023-desk-context-change"></script>
   </body>
 </html>

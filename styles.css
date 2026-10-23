@@ -1269,6 +1269,66 @@ body {
   background: rgba(1, 6, 12, 0.34);
 }
 
+.strategy-context {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.6fr) minmax(0, 2fr);
+  gap: 10px 22px;
+  padding: 10px 0 12px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.strategy-context > div { min-width: 0; }
+
+.strategy-context span,
+.desk-daily-change h3 {
+  color: #93b3c8;
+  font: 700 10px/1.5 var(--mono);
+  letter-spacing: 0.06em;
+}
+
+.strategy-context p {
+  margin: 4px 0 0;
+  color: #d5e0eb;
+  font-size: 12px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.strategy-context > div:first-child p { font-weight: 800; }
+
+.desk-daily-change {
+  margin: 0 0 12px;
+  padding: 11px 13px;
+  border-left: 2px solid rgba(116, 171, 191, 0.48);
+  background: rgba(86, 157, 183, 0.045);
+}
+
+.desk-daily-change h3 { margin: 0 0 5px; }
+
+.desk-daily-change p {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.desk-change-assessment {
+  color: #dbe5ef;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.desk-change-facts {
+  color: #b5c7d8;
+  font: 500 11px/1.8 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-change-note {
+  color: #8298ae;
+  font-size: 10px;
+  line-height: 1.65;
+}
+
 .strategy-decision-item.tone-bull { border-top-color: var(--bull); }
 .strategy-decision-item.tone-bear { border-top-color: var(--bear); }
 .strategy-decision-item.tone-risk { border-top-color: var(--risk); }
@@ -2819,6 +2879,8 @@ body {
   .strategy-decision {
     grid-template-columns: 1fr;
   }
+
+  .strategy-context { grid-template-columns: 1fr; }
 
   .signal-balance-lanes {
     grid-template-columns: 1fr;
