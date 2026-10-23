@@ -823,6 +823,8 @@ function buildDirectionalOutlook(strategy, reportDate = null) {
     qualifier: outlook.qualifier.trim(),
     horizon: outlook.horizon.trim(),
     reason: outlook.reason.trim(),
+    reviewType: outlook.reviewType === "retrospective" ? "retrospective" : null,
+    reviewedAt: /^\d{4}-\d{2}-\d{2}$/.test(outlook.reviewedAt ?? "") ? outlook.reviewedAt : null,
   };
 }
 
@@ -2004,7 +2006,10 @@ function renderStrategy(report, historyReports = []) {
   els.strategyDetails.open = false;
   els.strategyDetails.dataset.relationGroups = Object.values(strategyBlockRelations).flat().filter((group, index, groups) => groups.indexOf(group) === index).join(" ");
   bindResearchRelationInteraction(els.strategyDetails);
-  els.strategyBody.innerHTML = renderStrategyBlocks(blocks.filter((block) => block.label !== "主命題"), strategy.tone);
+  const reviewNotice = outlook.reviewType === "retrospective"
+    ? `<p class="strategy-review-notice" role="note">歷史重評${outlook.reviewedAt ? `｜${escapeHtml(outlook.reviewedAt)}` : ""}：以現行框架重讀截至 ${escapeHtml(report.date)} 的資料，非當時已發布的即時預測。上方摘要對應綜合方向，下方保留既有情境研究內文。</p>`
+    : "";
+  els.strategyBody.innerHTML = reviewNotice + renderStrategyBlocks(blocks.filter((block) => block.label !== "主命題"), strategy.tone);
   bindDeskEvidenceLinks();
   return strategy;
 }

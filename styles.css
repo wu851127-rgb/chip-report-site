@@ -1514,6 +1514,16 @@ body {
   gap: 10px;
 }
 
+.strategy-review-notice {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-left: 2px solid #63839b;
+  background: rgba(99, 131, 155, 0.06);
+  color: #a9bacd;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
 .strategy-block {
   border: 1px solid rgba(143, 163, 187, 0.14);
   background: rgba(255, 255, 255, 0.02);
