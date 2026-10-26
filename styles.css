@@ -2709,6 +2709,15 @@ body {
   letter-spacing: 0.015em;
 }
 
+.card-maintenance .card-note {
+  white-space: pre-line;
+  line-height: 1.65;
+}
+
+.card-maintenance .card-value {
+  color: var(--text);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .content.is-snapshot-loading .hero,
   .content.is-snapshot-loading .view.is-active > *,

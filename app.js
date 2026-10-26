@@ -9,6 +9,7 @@ const state = {
   loadRevision: 0,
   refreshing: false,
   retailPosition: null,
+  marketMaintenance: null,
   failedDate: null,
 };
 
@@ -2218,6 +2219,7 @@ function bindResearchRelationInteraction(node) {
 }
 
 function quickRead(card, groups, numeric) {
+  if (card.explanation) return card.explanation;
   const summary = relationDescriptions[groups[0]] ?? "欄位之間的關聯以同色群組微亮提示。";
   if (!isDirectionalCard(card.label) || numeric === null) return summary;
   return `當日數值${cardSignalLabel(card.label, numeric)}。${summary}`;
@@ -2601,6 +2603,7 @@ function buildShortTrendPanel(historyReports) {
 
 function buildCard(card, sectionTitle = "") {
   const node = els.cardTemplate.content.firstElementChild.cloneNode(true);
+  if (card.supplemental === "market-maintenance") node.classList.add("card-maintenance");
   if (card.alert) node.classList.add("card-alert");
   const numeric = numericValue(card.value);
   const directional = isDirectionalCard(card.label);
@@ -2627,6 +2630,39 @@ function buildCard(card, sectionTitle = "") {
   node.querySelector(".card-note").textContent = card.note ?? "";
   bindCardInteraction(node, card, sectionTitle);
   return node;
+}
+
+function buildMarketMaintenanceCard(date, series, previousDate) {
+  const rows = series?.schemaVersion === 1 && Array.isArray(series.observations) ? series.observations : [];
+  const find = (day) => {
+    const matches = rows.filter((row) => row?.date === day);
+    const rate = matches[0]?.ratePct;
+    return matches.length === 1 && typeof rate === "number" && Number.isFinite(rate) && rate > 0 ? rate : null;
+  };
+  const rate = find(date);
+  const previous = find(previousDate);
+  const beforePublication = date < "2026-08-03";
+  const delta = rate !== null && previous !== null ? Math.round((rate - previous) * 100) / 100 : null;
+  const change = delta === null ? "較前日：無官方可比資料"
+    : `較前日 ${delta > 0 ? "＋" : delta < 0 ? "−" : ""}${Math.abs(delta).toFixed(2)} 個百分點`;
+  const note = rate === null
+    ? `${beforePublication ? "官方自 2026/08/03 起提供" : "當日官方數據尚未取得，不以前日替代"}\n快照日期：${date.replaceAll("-", "/")}\n上市＋上櫃｜融資＋融券`
+    : `${change}\n資料日期：${date.replaceAll("-", "/")}\n上市＋上櫃｜融資＋融券`;
+  return {
+    label: "全市場擔保維持率", value: rate === null ? beforePublication ? "未提供" : "待公布" : rate / 100,
+    numFmt: "0.00%", note, supplemental: "market-maintenance",
+    explanation: "來源：證交所臺股儀表板，全市場。計算為（融資融券擔保品市值＋融券保證金）÷（融資金＋融券標的市值）×100%。日變化為當日減前一交易日，單位是百分點。這是整體市場的擔保緩衝，非個人帳戶維持率；不可套用個別帳戶追繳門檻，也不單獨推論多空或買賣。本欄僅供每日觀察，不納入 Desk View 評分；Excel 保留原報表欄位。",
+  };
+}
+
+function withMarketMaintenance(sections, date, series, previousDate) {
+  return sections.map((section) => {
+    if (section.title !== "大盤資訊") return section;
+    const cards = (section.cards ?? []).filter((card) => card.label !== "全市場擔保維持率");
+    const financing = cards.findIndex((card) => card.label === "融資金額變化量");
+    cards.splice(financing < 0 ? cards.length : financing + 1, 0, buildMarketMaintenanceCard(date, series, previousDate));
+    return { ...section, cards };
+  });
 }
 
 function buildRetailPositionPanel(position) {
@@ -3005,10 +3041,11 @@ async function loadHistoryReports(date, limit = 5, { index = state.index, cache 
 async function loadIndex({ refresh = false } = {}) {
   const revision = ++state.loadRevision;
   const cache = refresh ? new Map() : state.reportCache;
-  const [framework, overrides, index] = await Promise.all([
+  const [framework, overrides, index, maintenance] = await Promise.all([
     loadResearchFramework(),
     loadDeskViewOverrides({ required: refresh }),
     fetchJson("./data/reports/index.json"),
+    fetchJson("./data/market-maintenance.json").catch(() => null),
   ]);
   if (!index.latestDate || !Array.isArray(index.reports) || !index.reports.some((item) => item.date === index.latestDate)) {
     throw new Error("Report index is incomplete");
@@ -3025,6 +3062,7 @@ async function loadIndex({ refresh = false } = {}) {
   state.index = index;
   state.researchFramework = framework;
   state.deskViewOverrides = overrides;
+  state.marketMaintenance = maintenance;
   state.reportCache = cache;
   if (date) await loadReport(date, refresh && date !== state.currentDate, { revision, index, cache });
   return revision === state.loadRevision;
@@ -3041,7 +3079,8 @@ async function loadReport(date, updateQuery = true, { revision = ++state.loadRev
   if (revision !== state.loadRevision) return;
   const retailPosition = buildRetailPositionFromHistory(historyReports);
   state.retailPosition = retailPosition;
-  const dashboardSections = (report.dashboard.sections ?? []).map((section) => {
+  const previousDate = historyReports.find((item) => item.date < date)?.date;
+  const dashboardSections = withMarketMaintenance(report.dashboard.sections ?? [], date, state.marketMaintenance, previousDate).map((section) => {
     if (section.title !== "散戶") return section;
     return { ...section, retailPosition };
   });
