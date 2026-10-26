@@ -2635,6 +2635,7 @@ function buildCard(card, sectionTitle = "") {
 function buildMarketMaintenanceCard(date, series, previousDate) {
   const rows = series?.schemaVersion === 1 && Array.isArray(series.observations) ? series.observations : [];
   const find = (day) => {
+    if (typeof day !== "string" || day < "2026-08-03" || day > date) return null;
     const matches = rows.filter((row) => row?.date === day);
     const rate = matches[0]?.ratePct;
     return matches.length === 1 && typeof rate === "number" && Number.isFinite(rate) && rate > 0 ? rate : null;
@@ -2997,10 +2998,18 @@ function renderStatus(index, currentDate) {
   els.statusToday.classList.toggle("is-warn", !ok);
 }
 
-async function fetchJson(path) {
-  const response = await fetch(`${path}?t=${Date.now()}`, { cache: "no-store" });
-  if (!response.ok) throw new Error(`Failed to fetch ${path}`);
-  return response.json();
+async function fetchJson(path, { timeoutMs = 0 } = {}) {
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer = controller ? window.setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const response = await fetch(`${path}?t=${Date.now()}`, {
+      cache: "no-store", ...(controller ? { signal: controller.signal } : {}),
+    });
+    if (!response.ok) throw new Error(`Failed to fetch ${path}`);
+    return await response.json();
+  } finally {
+    if (timer !== null) window.clearTimeout(timer);
+  }
 }
 
 async function fetchReport(date, cache = state.reportCache) {
@@ -3045,7 +3054,7 @@ async function loadIndex({ refresh = false } = {}) {
     loadResearchFramework(),
     loadDeskViewOverrides({ required: refresh }),
     fetchJson("./data/reports/index.json"),
-    fetchJson("./data/market-maintenance.json").catch(() => null),
+    fetchJson("./data/market-maintenance.json", { timeoutMs: 5000 }).catch(() => null),
   ]);
   if (!index.latestDate || !Array.isArray(index.reports) || !index.reports.some((item) => item.date === index.latestDate)) {
     throw new Error("Report index is incomplete");
