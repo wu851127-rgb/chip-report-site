@@ -1251,9 +1251,8 @@ function renderStrategyBlocks(blocks, tone) {
     .map((block, index) => {
       const label = escapeHtml(block.label ?? "");
       const bodyHtml = stylizeStrategyBody(block.text, index === 0 ? tone : "neutral");
-      const relationKey = String(block.label ?? "").split("｜")[0];
-      const evidenceLinks = deskEvidenceLinks[relationKey] ?? [];
-      const relationGroups = strategyBlockRelations[relationKey] ?? evidenceLinks.flatMap((link) => link.groups);
+      const evidenceLinks = deskEvidenceLinks[block.label] ?? [];
+      const relationGroups = strategyBlockRelations[block.label] ?? evidenceLinks.flatMap((link) => link.groups);
       const relationAttribute = relationGroups.length ? ` data-relation-groups="${relationGroups.join(" ")}"` : "";
       const linksHtml = evidenceLinks.length === 0
         ? ""
@@ -1298,9 +1297,6 @@ const deskEvidenceLinks = {
 };
 
 const strategyBlockRelations = {
-  "主命題": ["market-price", "foreign-flow", "foreign-call", "foreign-put", "retail-net"],
-  "期權結構": ["foreign-call", "foreign-put"],
-  "SP 與可比性": ["foreign-put", "foreign-flow"],
   "歷史定位": ["market-price", "foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short", "retail-net"],
   "支持證據": ["foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short", "retail-net", "retail-micro"],
   "反證風險": ["foreign-flow", "foreign-call", "foreign-put", "retail-long", "retail-short", "retail-net"],
@@ -2018,14 +2014,12 @@ function buildStrategyView(report, historyReports = [], researchFramework = null
 function renderStrategy(report, historyReports = []) {
   const calculatedStrategy = buildStrategyView(report, historyReports, state.researchFramework);
   const dateOverride = state.deskViewOverrides?.[report.date];
-  // Complete authored reassessments replace stale templates; partial overrides still merge.
+  // Keep the full calculated framework and replace only the verified date-specific blocks.
   const strategy = dateOverride
     ? {
         ...calculatedStrategy,
         ...dateOverride,
-        blocks: dateOverride.blocksMode === "replace" && Array.isArray(dateOverride.blocks) && dateOverride.blocks.length
-          ? dateOverride.blocks
-          : mergeStrategyBlocks(calculatedStrategy.blocks, dateOverride.blocks),
+        blocks: mergeStrategyBlocks(calculatedStrategy.blocks, dateOverride.blocks),
       }
     : calculatedStrategy;
   els.strategyPanel.hidden = false;
@@ -2104,7 +2098,7 @@ function renderStrategy(report, historyReports = []) {
   els.strategyDetails.dataset.relationGroups = Object.values(strategyBlockRelations).flat().filter((group, index, groups) => groups.indexOf(group) === index).join(" ");
   bindResearchRelationInteraction(els.strategyDetails);
   const reviewNotice = outlook.reviewType === "retrospective"
-    ? `<p class="strategy-review-notice" role="note">歷史重評${outlook.reviewedAt ? `｜${escapeHtml(outlook.reviewedAt)}` : ""}：以現行框架重讀截至 ${escapeHtml(report.date)} 的資料，非當時已發布的即時預測。上方摘要對應綜合方向，下方為完整情境判讀；歷史重評不等於樣本外勝率。</p>`
+    ? `<p class="strategy-review-notice" role="note">歷史重評${outlook.reviewedAt ? `｜${escapeHtml(outlook.reviewedAt)}` : ""}：以現行框架重讀截至 ${escapeHtml(report.date)} 的資料，非當時已發布的即時預測。上方摘要對應綜合方向，下方保留既有情境研究內文。</p>`
     : "";
   els.strategyBody.innerHTML = reviewNotice + renderStrategyBlocks(blocks.filter((block) => block.label !== "主命題"), strategy.tone);
   bindDeskEvidenceLinks();
