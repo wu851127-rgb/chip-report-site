@@ -4,8 +4,8 @@
   "endpoint": "https://www.twse.com.tw/rwd/zh/marginTrading/BFIJ3U_TREND",
   "availableFrom": "2026-08-03",
   "scope": "上市＋上櫃｜融資＋融券",
-  "checkedThrough": "2026-10-30",
-  "checkedAt": "2026-11-02T13:43:32.240373+00:00",
+  "checkedThrough": "2026-11-02",
+  "checkedAt": "2026-11-02T14:46:58.789530+00:00",
   "observations": [
     {
       "date": "2026-08-03",
@@ -246,6 +246,10 @@
     {
       "date": "2026-10-30",
       "ratePct": 173.46
+    },
+    {
+      "date": "2026-11-02",
+      "ratePct": 173.62
     }
   ]
 }
