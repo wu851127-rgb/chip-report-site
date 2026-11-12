@@ -2842,6 +2842,97 @@ function buildRetailPositionPanel(position) {
   return panel;
 }
 
+function buildMicroPathSnapshot(reports, days = 1) {
+  if (![1, 3, 5].includes(days) || !reports[0]) return null;
+  const window = reports.slice(0, days + 1);
+  const read = (report) => {
+    const values = ["微台散戶看多", "微台散戶看空", "散戶看多", "散戶看空"]
+      .map((label) => getReportCardValue(report, label));
+    return values.every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0) ? values : null;
+  };
+  const values = window.map(read);
+  const current = values[0];
+  const valid = window.length === days + 1 && values.every(Boolean)
+    && window.every((r, i) => i === 0 || r.date < window[i - 1].date);
+  const base = valid ? values[days] : null;
+  const change = (a, b) => b === null ? null : { delta: a - b, rate: b === 0 ? null : (a - b) / b * 100 };
+  const sides = [0, 1].map((i) => {
+    const micro = current ? change(current[i], base ? base[i] : null) : null;
+    const small = current ? change(current[i + 2], base ? base[i + 2] : null) : null;
+    const equivalent = current ? change(current[i + 2] + current[i] / 5, base ? base[i + 2] + base[i] / 5 : null) : null;
+    return { current: current?.[i] ?? null, micro, small, equivalent,
+      divergent: micro && small ? Math.sign(micro.delta) * Math.sign(small.delta) < 0 : false };
+  });
+  return { date: reports[0].date, baseDate: valid ? reports[days].date : null, days, sides,
+    settlement: window.some(isSettlementReport), valid };
+}
+
+function buildMicroPathPanel(reports, review) {
+  if (!reports?.length) return null;
+  const panel = document.createElement("section");
+  panel.className = "micro-path-panel";
+  panel.setAttribute("aria-label", "微台籌碼路徑");
+  panel.dataset.relationGroups = "retail";
+  const make = (tag, text, className = "") => {
+    const el = document.createElement(tag);
+    el.textContent = text;
+    el.className = className;
+    return el;
+  };
+  const head = make("div", "", "micro-path-head");
+  head.appendChild(make("h4", "微台籌碼路徑"));
+  const controls = make("div", "", "micro-path-controls");
+  controls.setAttribute("role", "group");
+  controls.setAttribute("aria-label", "比較窗口");
+  head.appendChild(controls);
+  panel.appendChild(head);
+  const reviewed = review?.outlook?.asOfDate === reports[0].date && review?.summary?.conclusion;
+  panel.appendChild(make("p", reviewed ? review.summary.conclusion : "本日尚無已審核階段摘要；下方僅呈現部位變化，不自動判斷多空。", "micro-path-thesis"));
+  panel.appendChild(make("p", "階段引用當日 Desk View，綜合價格與期權判讀；非微台單一訊號，也非作者原始百分位。", "micro-path-caption"));
+  const content = make("div", "");
+  content.setAttribute("aria-live", "polite");
+  panel.appendChild(content);
+  const fmt = (value, digits = 0) => value === null ? "資料不足" : value.toLocaleString("zh-TW", { maximumFractionDigits: digits });
+  const signed = (value, digits = 0) => `${value > 0 ? "+" : ""}${fmt(value, digits)}`;
+  const buttons = [];
+  const draw = (days) => {
+    const snapshot = buildMicroPathSnapshot(reports, days);
+    buttons.forEach(({ button, value }) => button.setAttribute("aria-pressed", String(value === days)));
+    content.replaceChildren();
+    content.appendChild(make("p", snapshot.baseDate ? `${snapshot.baseDate} 收盤 → ${snapshot.date} 收盤｜${days}個交易日累計變化` : `${snapshot.date}｜相鄰資料不足，未跨日補算`, "micro-path-caption"));
+    const grid = make("div", "", "micro-path-grid");
+    snapshot.sides.forEach((side, i) => {
+      const card = make("div", "", "micro-path-card");
+      card.appendChild(make("span", i === 0 ? "微台多單" : "微台空單"));
+      card.appendChild(make("strong", `${fmt(side.current)} 口`, "micro-path-value"));
+      card.appendChild(make("p", side.micro ? `${side.micro.delta > 0 ? "↑" : side.micro.delta < 0 ? "↓" : "→"} ${signed(side.micro.delta)} 口｜${side.micro.rate === null ? "基期為零，變動率不適用" : `${signed(side.micro.rate, 2)}%`}` : "變化資料不足", "micro-path-change"));
+      card.appendChild(make("p", side.small ? `小台 ${signed(side.small.delta)} 口｜等值合計 ${signed(side.equivalent.delta, 1)} 口` : "小台／等值變化無法比較", "micro-path-caption"));
+      card.appendChild(make("p", side.divergent ? "方向分歧：小台與微台增減相反" : side.micro ? "未見相反增減方向；不代表多空確認" : "無法判斷部位分歧", side.divergent ? "micro-path-warning" : "micro-path-caption"));
+      grid.appendChild(card);
+    });
+    content.appendChild(grid);
+    content.appendChild(make("p", snapshot.settlement ? "此區間含結算標記：未拆分到期契約，不將縮量直接視為停損或出清。" : "聚合口數未拆分週到期／轉倉；沒有月結算標記也不代表已排除到期影響。", "micro-path-caption"));
+  };
+  [1, 3, 5].forEach((value) => {
+    const button = make("button", value === 1 ? "單日" : `${value}日`);
+    button.type = "button";
+    button.addEventListener("click", () => draw(value));
+    buttons.push({ button, value });
+    controls.appendChild(button);
+  });
+  const details = make("details", "", "micro-path-details");
+  details.appendChild(make("summary", "計算方式與判讀依據"));
+  details.appendChild(make("p", "累計增減＝選定日口數－N個交易日前口數；變動率＝累計增減÷基期口數。3／5日需4／6筆連續快照，不是每日百分比相加。等值＝小台＋微台÷5。正負與箭頭只表示部位增減，不是投資方向。"));
+  if (reviewed) {
+    details.appendChild(make("p", `支持證據：${review.summary.support || "未提供"}`));
+    details.appendChild(make("p", `反證風險：${review.summary.conflict || "未提供"}`));
+    details.appendChild(make("p", `重新評估條件：${review.summary.invalidation || "未提供"}`));
+  }
+  panel.appendChild(details);
+  draw(1);
+  return panel;
+}
+
 function buildSection(section) {
   const node = els.sectionTemplate.content.firstElementChild.cloneNode(true);
   node.classList.add(`section-${String(section.title ?? "").replaceAll(/[^a-zA-Z0-9]/g, "") || "data"}`);
@@ -2849,6 +2940,8 @@ function buildSection(section) {
   node.querySelector(".section-meta").textContent = `${section.cards?.length ?? 0} 項資料`;
   const grid = node.querySelector(".card-grid");
   const retailPanel = buildRetailPositionPanel(section.retailPosition);
+  const microPanel = buildMicroPathPanel(section.microHistory, section.microReview);
+  if (microPanel) grid.before(microPanel);
   if (retailPanel) grid.before(retailPanel);
   for (const card of section.cards ?? []) {
     grid.appendChild(buildCard(card, section.title ?? ""));
@@ -3095,7 +3188,7 @@ async function loadReport(date, updateQuery = true, { revision = ++state.loadRev
   const previousDate = historyReports.find((item) => item.date < date)?.date;
   const dashboardSections = withMarketMaintenance(report.dashboard.sections ?? [], date, state.marketMaintenance, previousDate).map((section) => {
     if (section.title !== "散戶") return section;
-    return { ...section, retailPosition };
+    return { ...section, retailPosition, microHistory: historyReports, microReview: state.deskViewOverrides?.[date] };
   });
   state.currentDate = date;
   if (updateQuery) {
