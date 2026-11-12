@@ -186,14 +186,15 @@ function assessRetailPosition({ longRank, shortRank, longShareRank, shortShareRa
 
 function buildRetailPositionFromHistory(historyReports) {
   const requiredLabels = ["散戶看多", "散戶看空", "微台散戶看多", "微台散戶看空", "微台散戶多空比"];
-  const samples = historyReports
-    .slice(0, 45)
+  // Keep 46 adjacent snapshots for 45 changes; levels still use 45 snapshots.
+  const adjacentSamples = historyReports
+    .slice(0, 46)
     .map((report) => {
       const values = Object.fromEntries(requiredLabels.map((label) => [label, getReportCardValue(report, label)]));
       return requiredLabels.every((label) => values[label] !== null) ? values : null;
-    })
-    .filter(Boolean);
-  const current = samples[0];
+    });
+  const samples = adjacentSamples.slice(0, 45).filter(Boolean);
+  const current = adjacentSamples[0];
   if (!current) return null;
 
   const equivalentLong = (values) => values["散戶看多"] + values["微台散戶看多"] / 5;
@@ -236,10 +237,11 @@ function buildRetailPositionFromHistory(historyReports) {
     };
   });
   const buildVelocityMetric = ({ key, label, equivalent, raw, formula, increased, decreased }) => {
-    const speedSamples = samples
+    const speedPairs = adjacentSamples
       .slice(0, -1)
       .map((values, index) => {
-        const previous = samples[index + 1];
+        const previous = adjacentSamples[index + 1];
+        if (!values || !previous) return null;
         const currentEquivalent = equivalent(values);
         const previousEquivalent = equivalent(previous);
         const currentRaw = raw(values);
@@ -251,9 +253,9 @@ function buildRetailPositionFromHistory(historyReports) {
           rawRate: (currentRaw - previousRaw) / previousRaw,
           rawDelta: currentRaw - previousRaw,
         };
-      })
-      .filter(Boolean);
-    const currentSpeed = speedSamples[0] ?? null;
+      });
+    const speedSamples = speedPairs.filter(Boolean);
+    const currentSpeed = speedPairs[0] ?? null;
     if (!currentSpeed) return null;
 
     const speedStrength = Math.abs(currentSpeed.equivalentRate);
@@ -270,6 +272,7 @@ function buildRetailPositionFromHistory(historyReports) {
       key,
       label,
       value: speedStrengthRank,
+      sampleCount: speedSamples.length,
       current: currentSpeed.equivalentRate,
       currentDelta: currentSpeed.equivalentDelta,
       rawRate: currentSpeed.rawRate,
@@ -287,7 +290,7 @@ function buildRetailPositionFromHistory(historyReports) {
     label: "等值多單增減速度",
     equivalent: equivalentLong,
     raw: rawLong,
-    formula: "等值多單 = 小台散戶看多 + 微台散戶看多 / 5；速度強度位階以近45日等值多單日變動率絕對值取中間排名。",
+    formula: "等值多單 = 小台散戶看多 + 微台散戶看多 / 5；速度強度位階取最近45筆相鄰交易日變動率絕對值的中間排名，完整樣本需46筆持倉資料；缺值不跨日補算。",
     increased: "追多",
     decreased: "去槓桿",
   });
@@ -296,13 +299,14 @@ function buildRetailPositionFromHistory(historyReports) {
     label: "等值空單增減速度",
     equivalent: equivalentShort,
     raw: rawShort,
-    formula: "等值空單 = 小台散戶看空 + 微台散戶看空 / 5；速度強度位階以近45日等值空單日變動率絕對值取中間排名。",
+    formula: "等值空單 = 小台散戶看空 + 微台散戶看空 / 5；速度強度位階取最近45筆相鄰交易日變動率絕對值的中間排名，完整樣本需46筆持倉資料；缺值不跨日補算。",
     increased: "空單加碼",
     decreased: "空單回補",
   });
   [longVelocity, shortVelocity].filter(Boolean).forEach((metric) => metrics.push(metric));
-  const history = samples.map((values, index) => {
-    const previous = samples[index + 1];
+  const history = adjacentSamples.slice(0, 45).flatMap((values, index) => {
+    if (!values) return [];
+    const previous = adjacentSamples[index + 1];
     const long = equivalentLong(values);
     const short = equivalentShort(values);
     const previousLong = previous ? equivalentLong(previous) : null;
