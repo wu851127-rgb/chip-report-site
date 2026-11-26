@@ -1,7 +1,13 @@
 {
-  "latestDate": "2026-11-24",
-  "generatedAt": "2026-11-24T14:46:47.315Z",
+  "latestDate": "2026-11-25",
+  "generatedAt": "2026-11-26T02:08:35.865Z",
   "reports": [
+    {
+      "date": "2026-11-25",
+      "title": "台股盤後籌碼儀表板 2026-11-25",
+      "xlsxHref": "./outputs/chip-report/台股盤後籌碼_2026-11-25.xlsx",
+      "jsonFile": "2026-11-25.json"
+    },
     {
       "date": "2026-11-24",
       "title": "台股盤後籌碼儀表板 2026-11-24",
